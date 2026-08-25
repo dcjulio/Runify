@@ -129,7 +129,7 @@ export function TrackPanel() {
                   className={viewMode === 'original' ? 'active' : ''}
                   onClick={handleShowOriginal}
                 >
-                  Original
+                  Original ({track.bpm} BPM)
                 </button>
                 <button
                   type="button"
