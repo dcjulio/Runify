@@ -43,3 +43,7 @@ pip install -r requirements.txt
 ```
 
 Requires [ffmpeg](https://ffmpeg.org/) on your `PATH` for broad audio format support (MP3, etc).
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE) — free to use, study, and modify for any noncommercial purpose. Commercial use is not permitted.
