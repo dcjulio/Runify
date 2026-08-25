@@ -4,7 +4,7 @@ import { TrackPanel, type TrackStatus } from './components/TrackPanel'
 import './App.css'
 
 function App() {
-  const [slots, setSlots] = useState<string[]>([crypto.randomUUID()])
+  const [slots, setSlots] = useState<string[]>([])
   const [initialFiles, setInitialFiles] = useState<Record<string, File>>({})
   const [statuses, setStatuses] = useState<Record<string, TrackStatus>>({})
   const [exporting, setExporting] = useState(false)

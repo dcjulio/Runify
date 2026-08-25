@@ -87,12 +87,6 @@ export function TrackPanel({ index, initialFile, onRemove, onStatusChange }: Tra
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    await uploadFile(file)
-  }
-
   async function handleApplyRetempo() {
     if (!track) return
     setRetempoing(true)
@@ -134,17 +128,11 @@ export function TrackPanel({ index, initialFile, onRemove, onStatusChange }: Tra
       </div>
 
       <div className="upload-row">
-        <label className="upload-button">
-          {uploading ? 'Uploading…' : 'Choose a song'}
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={handleFileChange}
-            disabled={uploading}
-            hidden
-          />
-        </label>
-        {track && <span className="filename">{track.filename}</span>}
+        {uploading ? (
+          <span className="filename">Uploading…</span>
+        ) : (
+          track && <span className="filename">{track.filename}</span>
+        )}
       </div>
 
       {error && <p className="error">{error}</p>}
