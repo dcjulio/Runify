@@ -6,7 +6,7 @@ Everything runs locally. Nothing is uploaded anywhere.
 
 ## Architecture
 
-- **`backend/`** — Python (FastAPI). Does all the audio work: decoding, BPM/key detection (librosa), time-stretching, crossfade mixing, final render. Runs on `http://localhost:8000`.
+- **`backend/`** — Python (FastAPI). Does all the audio work: decoding, BPM/key detection (librosa), time-stretching, crossfade mixing, final render. Runs on `http://localhost:8001`.
 - **root** — React + TypeScript (Vite). The interactive UI: upload, waveform display, draggable transition markers. Runs on `http://localhost:5173`.
 
 ## Running it
@@ -18,8 +18,10 @@ Two servers, two terminals.
 ```
 cd backend
 .venv\Scripts\activate
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8001
 ```
+
+(Port 8001, not the default 8000 — on this machine 8000 has a stuck orphaned socket that Windows won't release.)
 
 **Frontend:**
 

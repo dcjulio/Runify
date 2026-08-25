@@ -188,3 +188,20 @@ def retempo(y: np.ndarray, sr: int, current_bpm: float, target_bpm: float) -> np
     alpha = 1.0 / rate
     stretched = _wsola(y, alpha, sr)
     return stretched.T if stretched.ndim == 2 else stretched
+
+
+def to_stereo(y: np.ndarray) -> np.ndarray:
+    """y in soundfile convention: (samples,) or (samples, channels). Returns (samples, 2)."""
+    if y.ndim == 1:
+        return np.stack([y, y], axis=1)
+    if y.shape[1] == 1:
+        return np.repeat(y, 2, axis=1)
+    return y[:, :2]
+
+
+def resample_soundfile(y: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
+    """Resample audio in soundfile convention: (samples,) or (samples, channels)."""
+    is_multi = y.ndim == 2
+    y_lib = y.T if is_multi else y
+    y_resampled = librosa.resample(y_lib, orig_sr=orig_sr, target_sr=target_sr)
+    return y_resampled.T if is_multi else y_resampled

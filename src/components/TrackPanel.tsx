@@ -2,18 +2,25 @@ import { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import {
   type TrackInfo,
+  type TrackVersion,
   retempoAudioUrl,
   retempoTrack,
   trackAudioUrl,
   uploadTrack,
 } from '../api'
 
+export interface TrackStatus {
+  trackId: string | null
+  version: TrackVersion
+}
+
 interface TrackPanelProps {
   index: number
   onRemove: () => void
+  onStatusChange: (status: TrackStatus) => void
 }
 
-export function TrackPanel({ index, onRemove }: TrackPanelProps) {
+export function TrackPanel({ index, onRemove, onStatusChange }: TrackPanelProps) {
   const [track, setTrack] = useState<TrackInfo | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,8 +29,13 @@ export function TrackPanel({ index, onRemove }: TrackPanelProps) {
   const [retempoUrl, setRetempoUrl] = useState<string | null>(null)
   const [retempoBpm, setRetempoBpm] = useState<number | null>(null)
   const [retempoDuration, setRetempoDuration] = useState<number | null>(null)
-  const [viewMode, setViewMode] = useState<'original' | 'retempo'>('original')
+  const [viewMode, setViewMode] = useState<TrackVersion>('original')
   const [isPlaying, setIsPlaying] = useState(false)
+
+  useEffect(() => {
+    onStatusChange({ trackId: track?.track_id ?? null, version: viewMode })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track, viewMode])
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const wavesurferRef = useRef<WaveSurfer | null>(null)

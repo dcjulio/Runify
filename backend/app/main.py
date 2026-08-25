@@ -1,15 +1,17 @@
 import asyncio
+import io
 import shutil
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 import librosa
 import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from . import analysis
@@ -120,6 +122,12 @@ def retempo_track(track_id: str, req: RetempoRequest):
     y_stretched = analysis.retempo(track["audio"], track["sr"], track["bpm"], req.target_bpm)
     sr = track["sr"]
 
+    # cached (soundfile convention) so /mix/export can reuse it without
+    # re-reading the rendered file from disk
+    track["retempo_audio"] = y_stretched
+    track["retempo_sr"] = sr
+    track["retempo_bpm"] = req.target_bpm
+
     out_path = track_dir(track_id) / "retempo.wav"
     sf.write(out_path, y_stretched, sr)
 
@@ -139,3 +147,57 @@ def get_retempo_audio(track_id: str):
     if not out_path.exists():
         raise HTTPException(404, "No retempo render yet for this track")
     return FileResponse(out_path)
+
+
+class ExportTrackSpec(BaseModel):
+    track_id: str
+    version: Literal["original", "retempo"]
+
+
+class ExportRequest(BaseModel):
+    tracks: list[ExportTrackSpec]
+
+
+@app.post("/mix/export")
+def export_mix(req: ExportRequest):
+    """Concatenates tracks in queue order, no crossfade/transition -- each
+    track contributes whichever version (original/retempo) was selected in
+    the UI. A simpler milestone before beatmatched crossfade mixing."""
+    if not req.tracks:
+        raise HTTPException(400, "No tracks provided")
+
+    segments = []
+    target_sr: int | None = None
+
+    for spec in req.tracks:
+        track = get_track(spec.track_id)
+        if not track:
+            raise HTTPException(404, f"Track not found: {spec.track_id}")
+
+        if spec.version == "retempo":
+            if "retempo_audio" not in track:
+                raise HTTPException(400, f"Track {spec.track_id} has no retempo render yet")
+            y = track["retempo_audio"]
+            sr = track["retempo_sr"]
+        else:
+            y = track["audio"]
+            sr = track["sr"]
+            y = y.T if y.ndim == 2 else y  # librosa -> soundfile convention
+
+        if target_sr is None:
+            target_sr = sr
+        elif sr != target_sr:
+            y = analysis.resample_soundfile(y, sr, target_sr)
+
+        segments.append(analysis.to_stereo(y))
+
+    mixed = np.concatenate(segments, axis=0)
+
+    buffer = io.BytesIO()
+    sf.write(buffer, mixed, target_sr, format="WAV")
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="audio/wav",
+        headers={"Content-Disposition": 'attachment; filename="runify-mix.wav"'},
+    )

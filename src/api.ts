@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8000'
+const BASE_URL = 'http://localhost:8001'
 
 export interface TrackInfo {
   track_id: string
@@ -39,4 +39,23 @@ export async function retempoTrack(
     throw new Error(`Retempo failed: ${res.status} ${await res.text()}`)
   }
   return res.json()
+}
+
+export type TrackVersion = 'original' | 'retempo'
+
+export interface ExportTrackSpec {
+  track_id: string
+  version: TrackVersion
+}
+
+export async function exportMix(tracks: ExportTrackSpec[]): Promise<Blob> {
+  const res = await fetch(`${BASE_URL}/mix/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tracks }),
+  })
+  if (!res.ok) {
+    throw new Error(`Export failed: ${res.status} ${await res.text()}`)
+  }
+  return res.blob()
 }
