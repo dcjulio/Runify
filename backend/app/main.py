@@ -85,7 +85,7 @@ def retempo_track(track_id: str, req: RetempoRequest):
     if req.target_bpm <= 0:
         raise HTTPException(400, "target_bpm must be positive")
 
-    y, sr = librosa.load(track["original_path"], sr=None, mono=True)
+    y, sr = librosa.load(track["original_path"], sr=None, mono=False)
     y_stretched = analysis.retempo(y, sr, track["bpm"], req.target_bpm)
 
     out_path = track_dir(track_id) / "retempo.wav"
@@ -94,7 +94,7 @@ def retempo_track(track_id: str, req: RetempoRequest):
     return {
         "track_id": track_id,
         "target_bpm": req.target_bpm,
-        "duration": librosa.get_duration(y=y_stretched, sr=sr),
+        "duration": y_stretched.shape[0] / sr,
     }
 
 

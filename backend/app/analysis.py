@@ -1,6 +1,6 @@
 import librosa
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
+from numba import njit
 
 MAJOR_PROFILE = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
 MINOR_PROFILE = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
@@ -45,6 +45,77 @@ def detect_key(y: np.ndarray, sr: int) -> str:
         return f"{number}A"
 
 
+@njit(cache=True, fastmath=True)
+def _wsola_search_offsets(
+    ref: np.ndarray, out_len: int, frame_len: int, hop_out: int, hop_in: int, tol: int, max_offset: int
+) -> np.ndarray:
+    """Pick the splice offset for each synthesis frame by waveform similarity.
+
+    Runs on a single (mono-downmixed) reference channel so stereo channels
+    can later be extracted using the same offsets -- keeps left/right in
+    phase instead of drifting independently. JIT-compiled: this search
+    (tight nested loop over ~1500 candidate offsets x ~1000 frames for a
+    typical song) is the expensive part of retempo and is orders of
+    magnitude faster compiled than run frame-by-frame through the Python/
+    numpy call overhead.
+    """
+    overlap = frame_len - hop_out
+    max_frames = out_len // hop_out + 2
+    offsets = np.zeros(max_frames, dtype=np.int64)
+    offsets[0] = 0
+    count = 1
+
+    prev_offset = 0
+    syn_pos = hop_out
+
+    while syn_pos + frame_len < out_len and prev_offset < max_offset:
+        ideal = prev_offset + hop_in
+        lo = ideal - tol
+        if lo < 0:
+            lo = 0
+        hi = ideal + tol
+        if hi > max_offset:
+            hi = max_offset
+
+        if hi <= lo:
+            offset = ideal
+            if offset < 0:
+                offset = 0
+            if offset > max_offset:
+                offset = max_offset
+        else:
+            r_start = prev_offset + hop_out
+            ref_sumsq = 0.0
+            for i in range(overlap):
+                v = ref[r_start + i]
+                ref_sumsq += v * v
+            ref_norm = np.sqrt(ref_sumsq) + 1e-8
+
+            best_score = -1.0e18
+            best_offset = lo
+            for cand in range(lo, hi + 1):
+                dot = 0.0
+                cand_sumsq = 0.0
+                for i in range(overlap):
+                    rv = ref[r_start + i]
+                    cv = ref[cand + i]
+                    dot += rv * cv
+                    cand_sumsq += cv * cv
+                cand_norm = np.sqrt(cand_sumsq) + 1e-8
+                score = dot / (cand_norm * ref_norm)
+                if score > best_score:
+                    best_score = score
+                    best_offset = cand
+            offset = best_offset
+
+        offsets[count] = offset
+        count += 1
+        prev_offset = offset
+        syn_pos += hop_out
+
+    return offsets[:count]
+
+
 def _wsola(x: np.ndarray, alpha: float, sr: int) -> np.ndarray:
     """Waveform-similarity overlap-add time-scale modification.
 
@@ -53,55 +124,51 @@ def _wsola(x: np.ndarray, alpha: float, sr: int) -> np.ndarray:
     of interpolating phase in the frequency domain, so percussive transients
     (drum hits) keep their sharp shape instead of smearing -- the failure mode
     of a plain phase vocoder like librosa.effects.time_stretch.
+
+    x is mono (n_samples,) or multi-channel (n_channels, n_samples), matching
+    librosa's convention. Returns the same shape.
     """
+    is_multi = x.ndim == 2
+    channels = x if is_multi else x[np.newaxis, :]
+    n_channels, n_samples = channels.shape
+
     frame_len = max(256, int(round(0.04 * sr)))
     frame_len -= frame_len % 2
     hop_out = frame_len // 2
     hop_in = max(1, int(round(hop_out / alpha)))
     tol = hop_out
     overlap = frame_len - hop_out
+    pad_amount = frame_len + tol
+
+    out_len = int(np.ceil(n_samples * alpha)) + frame_len
+    max_offset = max(0, n_samples - 1)
+    target_len = int(round(n_samples * alpha))
+
+    reference = channels.mean(axis=0) if n_channels > 1 else channels[0]
+    reference = np.pad(reference, (0, pad_amount))
+    offsets = _wsola_search_offsets(reference, out_len, frame_len, hop_out, hop_in, tol, max_offset)
 
     window = np.hanning(frame_len)
-    xp = np.pad(x, (0, frame_len + tol))
+    result = np.zeros((n_channels, target_len))
 
-    out_len = int(np.ceil(len(x) * alpha)) + frame_len
-    y = np.zeros(out_len)
-    norm = np.zeros(out_len)
+    for c in range(n_channels):
+        xp = np.pad(channels[c], (0, pad_amount))
+        y = np.zeros(out_len)
+        norm = np.zeros(out_len)
+        syn_pos = 0
+        for offset in offsets:
+            y[syn_pos : syn_pos + frame_len] += xp[offset : offset + frame_len] * window
+            norm[syn_pos : syn_pos + frame_len] += window
+            syn_pos += hop_out
+        norm[norm < 1e-6] = 1.0
+        result[c] = (y / norm)[:target_len]
 
-    prev_offset = 0
-    y[0:frame_len] += xp[0:frame_len] * window
-    norm[0:frame_len] += window
-    syn_pos = hop_out
-    max_offset = max(0, len(x) - 1)
-
-    while syn_pos + frame_len < out_len and prev_offset < max_offset:
-        reference = xp[prev_offset + hop_out : prev_offset + hop_out + overlap]
-        ideal = prev_offset + hop_in
-        lo = max(0, ideal - tol)
-        hi = min(max_offset, ideal + tol)
-
-        if hi <= lo:
-            offset = min(max(ideal, 0), max_offset)
-        else:
-            candidates = sliding_window_view(xp[lo : hi + overlap], overlap)
-            ref_norm = np.linalg.norm(reference) + 1e-8
-            cand_norms = np.linalg.norm(candidates, axis=1) + 1e-8
-            scores = (candidates @ reference) / (cand_norms * ref_norm)
-            offset = lo + int(np.argmax(scores))
-
-        y[syn_pos : syn_pos + frame_len] += xp[offset : offset + frame_len] * window
-        norm[syn_pos : syn_pos + frame_len] += window
-
-        prev_offset = offset
-        syn_pos += hop_out
-
-    norm[norm < 1e-6] = 1.0
-    y = y / norm
-    target_len = int(round(len(x) * alpha))
-    return y[:target_len]
+    return result if is_multi else result[0]
 
 
 def retempo(y: np.ndarray, sr: int, current_bpm: float, target_bpm: float) -> np.ndarray:
+    """Returns audio ready for soundfile.write: (samples,) mono or (samples, channels) stereo."""
     rate = target_bpm / current_bpm
     alpha = 1.0 / rate
-    return _wsola(y, alpha, sr)
+    stretched = _wsola(y, alpha, sr)
+    return stretched.T if stretched.ndim == 2 else stretched
