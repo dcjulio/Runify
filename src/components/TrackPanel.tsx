@@ -21,6 +21,7 @@ export function TrackPanel({ index, onRemove }: TrackPanelProps) {
   const [retempoing, setRetempoing] = useState(false)
   const [retempoUrl, setRetempoUrl] = useState<string | null>(null)
   const [retempoBpm, setRetempoBpm] = useState<number | null>(null)
+  const [retempoDuration, setRetempoDuration] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<'original' | 'retempo'>('original')
   const [isPlaying, setIsPlaying] = useState(false)
 
@@ -54,6 +55,7 @@ export function TrackPanel({ index, onRemove }: TrackPanelProps) {
     setError(null)
     setRetempoUrl(null)
     setRetempoBpm(null)
+    setRetempoDuration(null)
     setViewMode('original')
     try {
       const info = await uploadTrack(file)
@@ -72,11 +74,12 @@ export function TrackPanel({ index, onRemove }: TrackPanelProps) {
     setRetempoing(true)
     setError(null)
     try {
-      await retempoTrack(track.track_id, targetBpm)
+      const result = await retempoTrack(track.track_id, targetBpm)
       const url = `${retempoAudioUrl(track.track_id)}?t=${Date.now()}`
       await wavesurferRef.current?.load(url)
       setRetempoUrl(url)
       setRetempoBpm(targetBpm)
+      setRetempoDuration(result.duration)
       setViewMode('retempo')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -164,9 +167,15 @@ export function TrackPanel({ index, onRemove }: TrackPanelProps) {
               <span className="stat-value">{track.key}</span>
             </div>
             <div className="stat">
-              <span className="stat-label">Duration</span>
+              <span className="stat-label">Duration @ {track.bpm}bpm</span>
               <span className="stat-value">{track.duration.toFixed(1)}s</span>
             </div>
+            {retempoDuration !== null && (
+              <div className="stat">
+                <span className="stat-label">Duration @ {retempoBpm}bpm</span>
+                <span className="stat-value">{retempoDuration.toFixed(1)}s</span>
+              </div>
+            )}
           </div>
 
           <div className="retempo-row">
