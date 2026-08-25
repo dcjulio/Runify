@@ -5,12 +5,25 @@ import './App.css'
 
 function App() {
   const [slots, setSlots] = useState<string[]>([crypto.randomUUID()])
+  const [initialFiles, setInitialFiles] = useState<Record<string, File>>({})
   const [statuses, setStatuses] = useState<Record<string, TrackStatus>>({})
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
-  function addSlot() {
-    setSlots((prev) => [...prev, crypto.randomUUID()])
+  function handleAddSongs(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+
+    const newIds = files.map(() => crypto.randomUUID())
+    setSlots((prev) => [...prev, ...newIds])
+    setInitialFiles((prev) => {
+      const next = { ...prev }
+      newIds.forEach((id, i) => {
+        next[id] = files[i]
+      })
+      return next
+    })
+    e.target.value = ''
   }
 
   function removeSlot(id: string) {
@@ -61,13 +74,21 @@ function App() {
           <TrackPanel
             key={id}
             index={index}
+            initialFile={initialFiles[id]}
             onRemove={() => removeSlot(id)}
             onStatusChange={(status) => updateStatus(id, status)}
           />
         ))}
-        <button type="button" className="add-song-button" onClick={addSlot}>
-          + Add another song
-        </button>
+        <label className="add-song-button">
+          + Add song(s)
+          <input
+            type="file"
+            accept="audio/*"
+            multiple
+            onChange={handleAddSongs}
+            hidden
+          />
+        </label>
 
         <div className="export-row">
           <button

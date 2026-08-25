@@ -16,11 +16,12 @@ export interface TrackStatus {
 
 interface TrackPanelProps {
   index: number
+  initialFile?: File
   onRemove: () => void
   onStatusChange: (status: TrackStatus) => void
 }
 
-export function TrackPanel({ index, onRemove, onStatusChange }: TrackPanelProps) {
+export function TrackPanel({ index, initialFile, onRemove, onStatusChange }: TrackPanelProps) {
   const [track, setTrack] = useState<TrackInfo | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -59,10 +60,7 @@ export function TrackPanel({ index, onRemove, onStatusChange }: TrackPanelProps)
     }
   }, [])
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  async function uploadFile(file: File) {
     setUploading(true)
     setError(null)
     setRetempoUrl(null)
@@ -79,6 +77,20 @@ export function TrackPanel({ index, onRemove, onStatusChange }: TrackPanelProps)
     } finally {
       setUploading(false)
     }
+  }
+
+  useEffect(() => {
+    if (initialFile) {
+      void uploadFile(initialFile)
+    }
+    // initialFile is only meant to seed this instance once, on creation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await uploadFile(file)
   }
 
   async function handleApplyRetempo() {
