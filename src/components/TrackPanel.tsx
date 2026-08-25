@@ -15,6 +15,7 @@ export function TrackPanel() {
   const [targetBpm, setTargetBpm] = useState<number>(0)
   const [retempoing, setRetempoing] = useState(false)
   const [retempoUrl, setRetempoUrl] = useState<string | null>(null)
+  const [retempoBpm, setRetempoBpm] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<'original' | 'retempo'>('original')
   const [isPlaying, setIsPlaying] = useState(false)
 
@@ -47,6 +48,7 @@ export function TrackPanel() {
     setUploading(true)
     setError(null)
     setRetempoUrl(null)
+    setRetempoBpm(null)
     setViewMode('original')
     try {
       const info = await uploadTrack(file)
@@ -69,6 +71,7 @@ export function TrackPanel() {
       const url = `${retempoAudioUrl(track.track_id)}?t=${Date.now()}`
       await wavesurferRef.current?.load(url)
       setRetempoUrl(url)
+      setRetempoBpm(targetBpm)
       setViewMode('retempo')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -133,7 +136,7 @@ export function TrackPanel() {
                   className={viewMode === 'retempo' ? 'active' : ''}
                   onClick={handleShowRetempo}
                 >
-                  Retempoed
+                  Retempoed{retempoBpm !== null ? ` (${retempoBpm} BPM)` : ''}
                 </button>
               </div>
             )}
