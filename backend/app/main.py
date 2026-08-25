@@ -38,14 +38,16 @@ async def upload_track(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, f)
 
     try:
-        y, sr = librosa.load(original_path, sr=None, mono=True)
+        y_multi, sr = librosa.load(original_path, sr=None, mono=False)
     except Exception as exc:
         shutil.rmtree(tdir, ignore_errors=True)
         raise HTTPException(400, f"Could not decode audio file: {exc}") from exc
 
-    bpm = analysis.detect_bpm(y, sr)
-    key = analysis.detect_key(y, sr)
-    duration = librosa.get_duration(y=y, sr=sr)
+    y_mono = librosa.to_mono(y_multi) if y_multi.ndim == 2 else y_multi
+
+    bpm = analysis.detect_bpm(y_mono, sr)
+    key = analysis.detect_key(y_mono, sr)
+    duration = librosa.get_duration(y=y_mono, sr=sr)
 
     tracks[track_id] = {
         "original_path": original_path,
@@ -54,6 +56,10 @@ async def upload_track(file: UploadFile = File(...)):
         "key": key,
         "duration": duration,
         "sr": sr,
+        # cached decoded audio (librosa convention: (samples,) mono or
+        # (channels, samples) stereo) so retempo never re-decodes the
+        # original file from disk
+        "audio": y_multi,
     }
 
     return {
@@ -85,8 +91,8 @@ def retempo_track(track_id: str, req: RetempoRequest):
     if req.target_bpm <= 0:
         raise HTTPException(400, "target_bpm must be positive")
 
-    y, sr = librosa.load(track["original_path"], sr=None, mono=False)
-    y_stretched = analysis.retempo(y, sr, track["bpm"], req.target_bpm)
+    y_stretched = analysis.retempo(track["audio"], track["sr"], track["bpm"], req.target_bpm)
+    sr = track["sr"]
 
     out_path = track_dir(track_id) / "retempo.wav"
     sf.write(out_path, y_stretched, sr)

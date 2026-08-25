@@ -1,6 +1,6 @@
 import librosa
 import numpy as np
-from numba import njit
+from numba import njit, prange
 
 MAJOR_PROFILE = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
 MINOR_PROFILE = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
@@ -45,7 +45,7 @@ def detect_key(y: np.ndarray, sr: int) -> str:
         return f"{number}A"
 
 
-@njit(cache=True, fastmath=True)
+@njit(cache=True, fastmath=True, parallel=True)
 def _wsola_search_offsets(
     ref: np.ndarray, out_len: int, frame_len: int, hop_out: int, hop_in: int, tol: int, max_offset: int
 ) -> np.ndarray:
@@ -57,7 +57,9 @@ def _wsola_search_offsets(
     (tight nested loop over ~1500 candidate offsets x ~1000 frames for a
     typical song) is the expensive part of retempo and is orders of
     magnitude faster compiled than run frame-by-frame through the Python/
-    numpy call overhead.
+    numpy call overhead. The per-frame candidate scan is also spread across
+    CPU cores (prange) -- each candidate's score is independent, so this is
+    a pure speedup with mathematically identical output, no quality tradeoff.
     """
     overlap = frame_len - hop_out
     max_frames = out_len // hop_out + 2
@@ -91,9 +93,10 @@ def _wsola_search_offsets(
                 ref_sumsq += v * v
             ref_norm = np.sqrt(ref_sumsq) + 1e-8
 
-            best_score = -1.0e18
-            best_offset = lo
-            for cand in range(lo, hi + 1):
+            n_cand = hi - lo + 1
+            scores = np.empty(n_cand)
+            for idx in prange(n_cand):
+                cand = lo + idx
                 dot = 0.0
                 cand_sumsq = 0.0
                 for i in range(overlap):
@@ -102,11 +105,15 @@ def _wsola_search_offsets(
                     dot += rv * cv
                     cand_sumsq += cv * cv
                 cand_norm = np.sqrt(cand_sumsq) + 1e-8
-                score = dot / (cand_norm * ref_norm)
-                if score > best_score:
-                    best_score = score
-                    best_offset = cand
-            offset = best_offset
+                scores[idx] = dot / (cand_norm * ref_norm)
+
+            best_idx = 0
+            best_score = scores[0]
+            for idx in range(1, n_cand):
+                if scores[idx] > best_score:
+                    best_score = scores[idx]
+                    best_idx = idx
+            offset = lo + best_idx
 
         offsets[count] = offset
         count += 1
