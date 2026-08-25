@@ -1,32 +1,45 @@
-# React + TypeScript + Vite
+# Runify
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A local tool for building a running mix from your own downloaded music: upload songs, see their BPM/key, retempo them to match, drag transition points on the waveform, and export the whole queue as one continuous audio file.
 
-Currently, two official plugins are available:
+Everything runs locally. Nothing is uploaded anywhere.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Architecture
 
-## React Compiler
+- **`backend/`** — Python (FastAPI). Does all the audio work: decoding, BPM/key detection (librosa), time-stretching, crossfade mixing, final render. Runs on `http://localhost:8000`.
+- **root** — React + TypeScript (Vite). The interactive UI: upload, waveform display, draggable transition markers. Runs on `http://localhost:5173`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Running it
 
-## Expanding the Oxlint configuration
+Two servers, two terminals.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+**Backend:**
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```
+cd backend
+.venv\Scripts\activate
+uvicorn app.main:app --reload
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+**Frontend:**
+
+```
+npm run dev
+```
+
+Then open the URL Vite prints (usually `http://localhost:5173`).
+
+## First-time setup
+
+```
+# frontend deps
+npm install
+
+# backend venv + deps
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Requires [ffmpeg](https://ffmpeg.org/) on your `PATH` for broad audio format support (MP3, etc).

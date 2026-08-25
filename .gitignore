@@ -29,3 +29,9 @@ dist-ssr
 
 # Claude Code session data
 .claude/
+
+# Python backend
+backend/.venv/
+backend/data/
+__pycache__/
+*.pyc
