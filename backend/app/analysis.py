@@ -1,5 +1,6 @@
 import librosa
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 
 MAJOR_PROFILE = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
 MINOR_PROFILE = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
@@ -32,6 +33,63 @@ def detect_key(y: np.ndarray, sr: int) -> str:
     return best_key
 
 
-def retempo(y: np.ndarray, current_bpm: float, target_bpm: float) -> np.ndarray:
+def _wsola(x: np.ndarray, alpha: float, sr: int) -> np.ndarray:
+    """Waveform-similarity overlap-add time-scale modification.
+
+    alpha = output length / input length (alpha < 1 speeds up, alpha > 1 slows
+    down). Splices real waveform segments chosen by cross-correlation instead
+    of interpolating phase in the frequency domain, so percussive transients
+    (drum hits) keep their sharp shape instead of smearing -- the failure mode
+    of a plain phase vocoder like librosa.effects.time_stretch.
+    """
+    frame_len = max(256, int(round(0.04 * sr)))
+    frame_len -= frame_len % 2
+    hop_out = frame_len // 2
+    hop_in = max(1, int(round(hop_out / alpha)))
+    tol = hop_out
+    overlap = frame_len - hop_out
+
+    window = np.hanning(frame_len)
+    xp = np.pad(x, (0, frame_len + tol))
+
+    out_len = int(np.ceil(len(x) * alpha)) + frame_len
+    y = np.zeros(out_len)
+    norm = np.zeros(out_len)
+
+    prev_offset = 0
+    y[0:frame_len] += xp[0:frame_len] * window
+    norm[0:frame_len] += window
+    syn_pos = hop_out
+    max_offset = max(0, len(x) - 1)
+
+    while syn_pos + frame_len < out_len and prev_offset < max_offset:
+        reference = xp[prev_offset + hop_out : prev_offset + hop_out + overlap]
+        ideal = prev_offset + hop_in
+        lo = max(0, ideal - tol)
+        hi = min(max_offset, ideal + tol)
+
+        if hi <= lo:
+            offset = min(max(ideal, 0), max_offset)
+        else:
+            candidates = sliding_window_view(xp[lo : hi + overlap], overlap)
+            ref_norm = np.linalg.norm(reference) + 1e-8
+            cand_norms = np.linalg.norm(candidates, axis=1) + 1e-8
+            scores = (candidates @ reference) / (cand_norms * ref_norm)
+            offset = lo + int(np.argmax(scores))
+
+        y[syn_pos : syn_pos + frame_len] += xp[offset : offset + frame_len] * window
+        norm[syn_pos : syn_pos + frame_len] += window
+
+        prev_offset = offset
+        syn_pos += hop_out
+
+    norm[norm < 1e-6] = 1.0
+    y = y / norm
+    target_len = int(round(len(x) * alpha))
+    return y[:target_len]
+
+
+def retempo(y: np.ndarray, sr: int, current_bpm: float, target_bpm: float) -> np.ndarray:
     rate = target_bpm / current_bpm
-    return librosa.effects.time_stretch(y, rate=rate)
+    alpha = 1.0 / rate
+    return _wsola(y, alpha, sr)
