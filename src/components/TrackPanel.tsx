@@ -8,7 +8,12 @@ import {
   uploadTrack,
 } from '../api'
 
-export function TrackPanel() {
+interface TrackPanelProps {
+  index: number
+  onRemove: () => void
+}
+
+export function TrackPanel({ index, onRemove }: TrackPanelProps) {
   const [track, setTrack] = useState<TrackInfo | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -94,6 +99,13 @@ export function TrackPanel() {
 
   return (
     <div className="track-panel">
+      <div className="track-panel-header">
+        <span className="track-number">Track {index + 1}</span>
+        <button type="button" className="remove-button" onClick={onRemove}>
+          Remove
+        </button>
+      </div>
+
       <div className="upload-row">
         <label className="upload-button">
           {uploading ? 'Uploading…' : 'Choose a song'}
