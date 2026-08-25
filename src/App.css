@@ -74,7 +74,6 @@ header h1 {
 }
 
 .play-button,
-.reset-button,
 .retempo-row button {
   background: #2c2c3a;
   color: #eaeaf2;
@@ -86,9 +85,37 @@ header h1 {
 }
 
 .play-button:hover,
-.reset-button:hover,
 .retempo-row button:hover {
   background: #3c3c4c;
+}
+
+.ab-toggle {
+  display: inline-flex;
+  border: 1px solid #3c3c4c;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ab-toggle button {
+  background: #14141c;
+  color: #b5b5c8;
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.ab-toggle button + button {
+  border-left: 1px solid #3c3c4c;
+}
+
+.ab-toggle button.active {
+  background: #6c5ce7;
+  color: white;
+}
+
+.ab-toggle button:not(.active):hover {
+  background: #2c2c3a;
 }
 
 .stats-row {

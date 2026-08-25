@@ -14,7 +14,8 @@ export function TrackPanel() {
   const [error, setError] = useState<string | null>(null)
   const [targetBpm, setTargetBpm] = useState<number>(0)
   const [retempoing, setRetempoing] = useState(false)
-  const [isRetempoed, setIsRetempoed] = useState(false)
+  const [retempoUrl, setRetempoUrl] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'original' | 'retempo'>('original')
   const [isPlaying, setIsPlaying] = useState(false)
 
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -45,7 +46,8 @@ export function TrackPanel() {
 
     setUploading(true)
     setError(null)
-    setIsRetempoed(false)
+    setRetempoUrl(null)
+    setViewMode('original')
     try {
       const info = await uploadTrack(file)
       setTrack(info)
@@ -66,7 +68,8 @@ export function TrackPanel() {
       await retempoTrack(track.track_id, targetBpm)
       const url = `${retempoAudioUrl(track.track_id)}?t=${Date.now()}`
       await wavesurferRef.current?.load(url)
-      setIsRetempoed(true)
+      setRetempoUrl(url)
+      setViewMode('retempo')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -74,10 +77,16 @@ export function TrackPanel() {
     }
   }
 
-  async function handleResetToOriginal() {
-    if (!track) return
+  async function handleShowOriginal() {
+    if (!track || viewMode === 'original') return
     await wavesurferRef.current?.load(trackAudioUrl(track.track_id))
-    setIsRetempoed(false)
+    setViewMode('original')
+  }
+
+  async function handleShowRetempo() {
+    if (!retempoUrl || viewMode === 'retempo') return
+    await wavesurferRef.current?.load(retempoUrl)
+    setViewMode('retempo')
   }
 
   return (
@@ -110,10 +119,23 @@ export function TrackPanel() {
             >
               {isPlaying ? 'Pause' : 'Play'}
             </button>
-            {isRetempoed && (
-              <button type="button" className="reset-button" onClick={handleResetToOriginal}>
-                Back to original
-              </button>
+            {retempoUrl && (
+              <div className="ab-toggle">
+                <button
+                  type="button"
+                  className={viewMode === 'original' ? 'active' : ''}
+                  onClick={handleShowOriginal}
+                >
+                  Original
+                </button>
+                <button
+                  type="button"
+                  className={viewMode === 'retempo' ? 'active' : ''}
+                  onClick={handleShowRetempo}
+                >
+                  Retempoed
+                </button>
+              </div>
             )}
           </div>
 
@@ -146,7 +168,11 @@ export function TrackPanel() {
             <button type="button" onClick={handleApplyRetempo} disabled={retempoing}>
               {retempoing ? 'Rendering…' : 'Apply'}
             </button>
-            {isRetempoed && <span className="retempo-badge">retempoed</span>}
+            {retempoUrl && (
+              <span className="retempo-badge">
+                {viewMode === 'retempo' ? 'viewing retempoed' : 'viewing original'}
+              </span>
+            )}
           </div>
         </>
       )}
