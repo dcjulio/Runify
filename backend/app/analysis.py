@@ -6,6 +6,10 @@ MAJOR_PROFILE = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 
 MINOR_PROFILE = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
 PITCH_CLASSES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
+# Camelot wheel position for each pitch class, major ("B") and relative minor ("A")
+CAMELOT_MAJOR = {"C": 8, "G": 9, "D": 10, "A": 11, "E": 12, "B": 1, "F#": 2, "C#": 3, "G#": 4, "D#": 5, "A#": 6, "F": 7}
+CAMELOT_MINOR = {"A": 8, "E": 9, "B": 10, "F#": 11, "C#": 12, "G#": 1, "D#": 2, "A#": 3, "F": 4, "C": 5, "G": 6, "D": 7}
+
 
 def detect_bpm(y: np.ndarray, sr: int) -> float:
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
@@ -18,19 +22,27 @@ def detect_key(y: np.ndarray, sr: int) -> str:
     profile = chroma.mean(axis=1)
 
     best_score = -np.inf
-    best_key = None
+    best_pitch_class = None
+    best_mode = None
     for i in range(12):
         major_score = np.corrcoef(profile, np.roll(MAJOR_PROFILE, i))[0, 1]
         if major_score > best_score:
             best_score = major_score
-            best_key = f"{PITCH_CLASSES[i]} major"
+            best_pitch_class = PITCH_CLASSES[i]
+            best_mode = "major"
 
         minor_score = np.corrcoef(profile, np.roll(MINOR_PROFILE, i))[0, 1]
         if minor_score > best_score:
             best_score = minor_score
-            best_key = f"{PITCH_CLASSES[i]} minor"
+            best_pitch_class = PITCH_CLASSES[i]
+            best_mode = "minor"
 
-    return best_key
+    if best_mode == "major":
+        number = CAMELOT_MAJOR[best_pitch_class]
+        return f"{number}B"
+    else:
+        number = CAMELOT_MINOR[best_pitch_class]
+        return f"{number}A"
 
 
 def _wsola(x: np.ndarray, alpha: float, sr: int) -> np.ndarray:
