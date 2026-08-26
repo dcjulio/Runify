@@ -47,6 +47,13 @@ function nearestOctaveTarget(trackBpm: number, targetBpm: number): number {
   return best
 }
 
+// BPM numbers are always shown rounded -- sub-BPM precision isn't
+// meaningful to look at, even though the underlying values (what's sent
+// to the backend for retempo ratios etc.) stay precise.
+function formatBpm(n: number): number {
+  return Math.round(n)
+}
+
 type BpmJumpSeverity = 'none' | 'mild' | 'strong'
 
 // Time-stretch artifacts scale with percentage change, not raw BPM count.
@@ -107,17 +114,21 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   }
 
   useEffect(() => {
-    if (track) setBpmInput(String(track.bpm))
+    if (track) setBpmInput(String(formatBpm(track.bpm)))
   }, [track])
 
   async function commitBpmCorrection() {
     if (!track) return
     const n = Number.parseFloat(bpmInput)
     if (!Number.isFinite(n) || n <= 0) {
-      setBpmInput(String(track.bpm))
+      setBpmInput(String(formatBpm(track.bpm)))
       return
     }
-    if (n === track.bpm) return
+    // Compare against the same rounded baseline the field displays, not
+    // the raw precise value -- otherwise just clicking into the field and
+    // out again (without changing anything) would look like a real edit
+    // and silently submit a correction to the rounded number.
+    if (n === formatBpm(track.bpm)) return
 
     setError(null)
     try {
@@ -133,7 +144,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
       await wavesurferRef.current?.load(trackAudioUrl(track.track_id))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-      setBpmInput(String(track.bpm))
+      setBpmInput(String(formatBpm(track.bpm)))
     }
   }
 
@@ -186,7 +197,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     try {
       const info = await uploadTrack(file)
       setTrack(info)
-      setTargetBpm(info.bpm)
+      setTargetBpm(formatBpm(info.bpm))
       await wavesurferRef.current?.load(trackAudioUrl(info.track_id))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -209,7 +220,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
       duration: t.duration,
     }
     setTrack(info)
-    setTargetBpm(t.bpm)
+    setTargetBpm(formatBpm(t.bpm))
     await wavesurferRef.current?.load(trackAudioUrl(t.track_id))
   }
 
@@ -247,7 +258,9 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   }, [])
 
   async function applyRetempo(trackId: string, bpm: number) {
-    setTargetBpm(bpm)
+    // bpm stays precise for the actual API call (the stretch ratio); only
+    // the displayed target updates to the rounded value.
+    setTargetBpm(formatBpm(bpm))
     setRetempoing(true)
     setError(null)
     try {
@@ -255,7 +268,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
       const url = `${retempoAudioUrl(trackId)}?t=${Date.now()}`
       await wavesurferRef.current?.load(url)
       setRetempoUrl(url)
-      setRetempoBpm(bpm)
+      setRetempoBpm(formatBpm(bpm))
       setRetempoDuration(result.duration)
       setViewMode('retempo')
     } catch (err) {
@@ -351,14 +364,14 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
                   className={viewMode === 'original' ? 'active' : ''}
                   onClick={handleShowOriginal}
                 >
-                  Original ({track.bpm} BPM)
+                  Original ({formatBpm(track.bpm)} BPM)
                 </button>
                 <button
                   type="button"
                   className={viewMode === 'retempo' ? 'active' : ''}
                   onClick={handleShowRetempo}
                 >
-                  Retempoed{retempoBpm !== null ? ` (${retempoBpm} BPM)` : ''}
+                  Retempoed{retempoBpm !== null ? ` (${formatBpm(retempoBpm)} BPM)` : ''}
                 </button>
               </div>
             )}
@@ -366,28 +379,28 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
 
           <div className="stats-row">
             <div className="stat">
-              <span className="stat-label">Detected BPM</span>
+              <span className="stat-label">Detected BPM: {formatBpm(track.detected_bpm)}</span>
               <div className="bpm-value-row">
                 <input
                   type="number"
                   className={`bpm-correction-input${track.bpm !== track.detected_bpm ? ' corrected' : ''}`}
                   min={20}
                   max={300}
-                  step={0.01}
+                  step={1}
                   value={bpmInput}
                   onChange={(e) => setBpmInput(e.target.value)}
                   onBlur={commitBpmCorrection}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') e.currentTarget.blur()
                   }}
-                  title="Automatically detected -- click to correct if it sounds wrong"
+                  title="Click to correct if it sounds wrong"
                 />
                 {track.bpm !== track.detected_bpm && (
                   <button
                     type="button"
                     className="reset-bpm-button"
                     onClick={handleResetBpm}
-                    title={`Reset to the automatically detected value: ${track.detected_bpm} BPM`}
+                    title={`Reset to the automatically detected value: ${formatBpm(track.detected_bpm)} BPM`}
                   >
                     ↺
                   </button>
@@ -399,12 +412,12 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
               <span className="stat-value">{track.key}</span>
             </div>
             <div className="stat">
-              <span className="stat-label">Duration @ {track.bpm}bpm</span>
+              <span className="stat-label">Duration @ {formatBpm(track.bpm)} bpm</span>
               <span className="stat-value">{track.duration.toFixed(1)}s</span>
             </div>
-            {retempoDuration !== null && (
+            {retempoDuration !== null && retempoBpm !== null && (
               <div className="stat">
-                <span className="stat-label">Duration @ {retempoBpm}bpm</span>
+                <span className="stat-label">Duration @ {formatBpm(retempoBpm)} bpm</span>
                 <span className="stat-value">{retempoDuration.toFixed(1)}s</span>
               </div>
             )}
