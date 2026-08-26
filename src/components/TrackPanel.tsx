@@ -145,7 +145,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     setTargetBpm(t.target_bpm ?? t.bpm)
     await wavesurferRef.current?.load(trackAudioUrl(t.track_id))
     if (t.version === 'retempo' && t.target_bpm !== null) {
-      await applyRetempo(t.target_bpm)
+      await applyRetempo(t.track_id, t.target_bpm)
     }
   }
 
@@ -161,14 +161,13 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function applyRetempo(bpm: number) {
-    if (!track) return
+  async function applyRetempo(trackId: string, bpm: number) {
     setTargetBpm(bpm)
     setRetempoing(true)
     setError(null)
     try {
-      const result = await retempoTrack(track.track_id, bpm)
-      const url = `${retempoAudioUrl(track.track_id)}?t=${Date.now()}`
+      const result = await retempoTrack(trackId, bpm)
+      const url = `${retempoAudioUrl(trackId)}?t=${Date.now()}`
       await wavesurferRef.current?.load(url)
       setRetempoUrl(url)
       setRetempoBpm(bpm)
@@ -182,13 +181,15 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   }
 
   function handleApplyRetempo() {
-    void applyRetempo(targetBpm)
+    if (!track) return
+    void applyRetempo(track.track_id, targetBpm)
   }
 
   useImperativeHandle(ref, () => ({
     applyTempo: (bpm: number) => {
-      const effectiveBpm = track ? nearestOctaveTarget(track.bpm, bpm) : bpm
-      void applyRetempo(effectiveBpm)
+      if (!track) return
+      const effectiveBpm = nearestOctaveTarget(track.bpm, bpm)
+      void applyRetempo(track.track_id, effectiveBpm)
     },
   }))
 
