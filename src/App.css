@@ -301,6 +301,58 @@ header h1 {
   border-radius: 999px;
 }
 
+.playlist-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.playlist-save,
+.playlist-load {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 240px;
+}
+
+.playlist-save input[type='text'],
+.playlist-load select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid #3c3c4c;
+  background: #14141c;
+  color: #eaeaf2;
+  font-size: 0.9rem;
+}
+
+.playlist-save button,
+.playlist-load button {
+  background: #2c2c3a;
+  color: #eaeaf2;
+  border: 1px solid #3c3c4c;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.playlist-save button:hover:not(:disabled),
+.playlist-load button:hover:not(:disabled) {
+  background: #3c3c4c;
+}
+
+.playlist-save button:disabled,
+.playlist-load button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .global-tempo-row {
   display: flex;
   align-items: center;

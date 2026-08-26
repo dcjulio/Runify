@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import {
+  type LoadedPlaylistTrack,
   type TrackInfo,
   type TrackVersion,
   retempoAudioUrl,
@@ -12,6 +13,7 @@ import {
 export interface TrackStatus {
   trackId: string | null
   version: TrackVersion
+  targetBpm: number | null
 }
 
 export interface TrackPanelHandle {
@@ -48,13 +50,14 @@ interface TrackPanelProps {
   index: number
   totalTracks: number
   initialFile?: File
+  existingTrack?: LoadedPlaylistTrack
   onRemove: () => void
   onMove: (newPosition: number) => void
   onStatusChange: (status: TrackStatus) => void
 }
 
 export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function TrackPanel(
-  { index, totalTracks, initialFile, onRemove, onMove, onStatusChange },
+  { index, totalTracks, initialFile, existingTrack, onRemove, onMove, onStatusChange },
   ref,
 ) {
   const [track, setTrack] = useState<TrackInfo | null>(null)
@@ -71,9 +74,9 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   const [lastFile, setLastFile] = useState<File | null>(null)
 
   useEffect(() => {
-    onStatusChange({ trackId: track?.track_id ?? null, version: viewMode })
+    onStatusChange({ trackId: track?.track_id ?? null, version: viewMode, targetBpm: retempoBpm })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track, viewMode])
+  }, [track, viewMode, retempoBpm])
 
   useEffect(() => {
     setPositionInput(String(index + 1))
@@ -130,11 +133,31 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     }
   }
 
+  async function hydrateExisting(t: LoadedPlaylistTrack) {
+    const info: TrackInfo = {
+      track_id: t.track_id,
+      filename: t.filename,
+      bpm: t.bpm,
+      key: t.key,
+      duration: t.duration,
+    }
+    setTrack(info)
+    setTargetBpm(t.target_bpm ?? t.bpm)
+    await wavesurferRef.current?.load(trackAudioUrl(t.track_id))
+    if (t.version === 'retempo' && t.target_bpm !== null) {
+      await applyRetempo(t.target_bpm)
+    }
+  }
+
   useEffect(() => {
     if (initialFile) {
       void uploadFile(initialFile)
+    } else if (existingTrack) {
+      void hydrateExisting(existingTrack)
     }
-    // initialFile is only meant to seed this instance once, on creation
+    // initialFile/existingTrack are only meant to seed this instance once,
+    // on creation -- a given slot is always exactly one of "new upload" or
+    // "loaded from a saved mix", never both, never changing after mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

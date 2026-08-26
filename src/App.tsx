@@ -1,17 +1,44 @@
-import { useRef, useState } from 'react'
-import { exportMix } from './api'
+import { useEffect, useRef, useState } from 'react'
+import {
+  type LoadedPlaylistTrack,
+  exportMix,
+  listPlaylists,
+  loadPlaylist,
+  savePlaylist,
+} from './api'
 import { TrackPanel, type TrackPanelHandle, type TrackStatus } from './components/TrackPanel'
 import './App.css'
 
 function App() {
   const [slots, setSlots] = useState<string[]>([])
   const [initialFiles, setInitialFiles] = useState<Record<string, File>>({})
+  const [existingTracks, setExistingTracks] = useState<Record<string, LoadedPlaylistTrack>>({})
   const [statuses, setStatuses] = useState<Record<string, TrackStatus>>({})
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [globalTargetBpm, setGlobalTargetBpm] = useState<number>(120)
 
+  const [playlistNames, setPlaylistNames] = useState<string[]>([])
+  const [saveName, setSaveName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [selectedPlaylist, setSelectedPlaylist] = useState('')
+  const [loadingPlaylist, setLoadingPlaylist] = useState(false)
+  const [playlistError, setPlaylistError] = useState<string | null>(null)
+
   const panelRefs = useRef<Record<string, TrackPanelHandle | null>>({})
+
+  async function refreshPlaylistNames() {
+    try {
+      const names = await listPlaylists()
+      setPlaylistNames(names)
+    } catch {
+      // non-critical, just leave the list as-is
+    }
+  }
+
+  useEffect(() => {
+    void refreshPlaylistNames()
+  }, [])
 
   function handleAddSongs(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -66,7 +93,7 @@ function App() {
     })
   }
 
-  async function handleDownloadMix() {
+  async function handleExportMix() {
     setExporting(true)
     setExportError(null)
     try {
@@ -86,6 +113,48 @@ function App() {
     }
   }
 
+  async function handleSaveMix() {
+    const name = saveName.trim()
+    if (!name || readyTracks.length === 0) return
+    setSaving(true)
+    setPlaylistError(null)
+    try {
+      await savePlaylist(
+        name,
+        readyTracks.map((s) => ({ track_id: s.trackId, target_bpm: s.targetBpm, version: s.version })),
+      )
+      await refreshPlaylistNames()
+    } catch (err) {
+      setPlaylistError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleLoadMix() {
+    if (!selectedPlaylist) return
+    setLoadingPlaylist(true)
+    setPlaylistError(null)
+    try {
+      const data = await loadPlaylist(selectedPlaylist)
+      const newIds = data.tracks.map(() => crypto.randomUUID())
+      setSlots(newIds)
+      setStatuses({})
+      setInitialFiles({})
+      setExistingTracks(() => {
+        const next: Record<string, LoadedPlaylistTrack> = {}
+        newIds.forEach((id, i) => {
+          next[id] = data.tracks[i]
+        })
+        return next
+      })
+    } catch (err) {
+      setPlaylistError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoadingPlaylist(false)
+    }
+  }
+
   return (
     <div className="app">
       <header>
@@ -93,6 +162,47 @@ function App() {
         <p className="subtitle">Build your running mix</p>
       </header>
       <main>
+        <div className="playlist-row">
+          <div className="playlist-save">
+            <input
+              type="text"
+              placeholder="Mix name"
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={handleSaveMix}
+              disabled={!saveName.trim() || readyTracks.length === 0 || saving}
+            >
+              {saving ? 'Saving…' : 'Save mix'}
+            </button>
+          </div>
+          <div className="playlist-load">
+            <select
+              value={selectedPlaylist}
+              onChange={(e) => setSelectedPlaylist(e.target.value)}
+            >
+              <option value="">
+                {playlistNames.length === 0 ? 'No saved mixes' : 'Choose a saved mix…'}
+              </option>
+              {playlistNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleLoadMix}
+              disabled={!selectedPlaylist || loadingPlaylist}
+            >
+              {loadingPlaylist ? 'Loading…' : 'Load mix'}
+            </button>
+          </div>
+        </div>
+        {playlistError && <p className="error">{playlistError}</p>}
+
         {readyTracks.length > 0 && (
           <div className="global-tempo-row">
             <label htmlFor="global-target-bpm">Target BPM for all</label>
@@ -120,6 +230,7 @@ function App() {
             index={index}
             totalTracks={slots.length}
             initialFile={initialFiles[id]}
+            existingTrack={existingTracks[id]}
             onRemove={() => removeSlot(id)}
             onMove={(newPosition) => moveSlot(id, newPosition)}
             onStatusChange={(status) => updateStatus(id, status)}
@@ -140,10 +251,10 @@ function App() {
           <button
             type="button"
             className="download-mix-button"
-            onClick={handleDownloadMix}
+            onClick={handleExportMix}
             disabled={readyTracks.length === 0 || exporting}
           >
-            {exporting ? 'Exporting…' : `Download full mix (${readyTracks.length} track${readyTracks.length === 1 ? '' : 's'})`}
+            {exporting ? 'Exporting…' : `Export mix (${readyTracks.length} track${readyTracks.length === 1 ? '' : 's'})`}
           </button>
           {exportError && <p className="error">{exportError}</p>}
         </div>

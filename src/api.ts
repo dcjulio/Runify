@@ -59,3 +59,49 @@ export async function exportMix(tracks: ExportTrackSpec[]): Promise<Blob> {
   }
   return res.blob()
 }
+
+export interface PlaylistTrackSpec {
+  track_id: string
+  target_bpm: number | null
+  version: TrackVersion
+}
+
+export async function savePlaylist(name: string, tracks: PlaylistTrackSpec[]): Promise<void> {
+  const res = await fetch(`${BASE_URL}/playlists`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, tracks }),
+  })
+  if (!res.ok) {
+    throw new Error(`Save mix failed: ${res.status} ${await res.text()}`)
+  }
+}
+
+export async function listPlaylists(): Promise<string[]> {
+  const res = await fetch(`${BASE_URL}/playlists`)
+  if (!res.ok) {
+    throw new Error(`Failed to list saved mixes: ${res.status} ${await res.text()}`)
+  }
+  const data = await res.json()
+  return data.playlists
+}
+
+export interface LoadedPlaylistTrack {
+  track_id: string
+  target_bpm: number | null
+  version: TrackVersion
+  filename: string
+  bpm: number
+  key: string
+  duration: number
+}
+
+export async function loadPlaylist(
+  name: string,
+): Promise<{ name: string; tracks: LoadedPlaylistTrack[] }> {
+  const res = await fetch(`${BASE_URL}/playlists/${encodeURIComponent(name)}`)
+  if (!res.ok) {
+    throw new Error(`Load mix failed: ${res.status} ${await res.text()}`)
+  }
+  return res.json()
+}

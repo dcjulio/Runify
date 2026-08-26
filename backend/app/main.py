@@ -1,5 +1,6 @@
 import asyncio
 import io
+import re
 import shutil
 import uuid
 from contextlib import asynccontextmanager
@@ -14,12 +15,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
-from . import analysis
+from . import analysis, storage
 from .storage import get_track, track_dir, tracks
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Repopulate tracks from previously uploaded files on disk -- otherwise
+    # every restart (which --reload triggers on every backend edit) wipes
+    # the in-memory index and breaks any saved playlist referencing them.
+    storage.rebuild_tracks_from_disk()
+
     # detect_bpm and detect_key run concurrently in worker threads per
     # upload. Both lazily import scipy.signal/scipy.linalg submodules on
     # first use -- if two threads hit that first import at the same instant,
@@ -89,6 +95,7 @@ async def upload_track(file: UploadFile = File(...)):
         # original file from disk
         "audio": y_multi,
     }
+    storage.save_track_meta(track_id)
 
     return {
         "track_id": track_id,
@@ -119,7 +126,8 @@ def retempo_track(track_id: str, req: RetempoRequest):
     if req.target_bpm <= 0:
         raise HTTPException(400, "target_bpm must be positive")
 
-    y_stretched = analysis.retempo(track["audio"], track["sr"], track["bpm"], req.target_bpm)
+    audio = storage.get_track_audio(track_id)
+    y_stretched = analysis.retempo(audio, track["sr"], track["bpm"], req.target_bpm)
     sr = track["sr"]
 
     # cached (soundfile convention) so /mix/export can reuse it without
@@ -175,14 +183,14 @@ def export_mix(req: ExportRequest):
             raise HTTPException(404, f"Track not found: {spec.track_id}")
 
         if spec.version == "retempo":
-            if "retempo_audio" not in track:
+            result = storage.get_track_retempo_audio(spec.track_id)
+            if result is None:
                 raise HTTPException(400, f"Track {spec.track_id} has no retempo render yet")
-            y = track["retempo_audio"]
-            sr = track["retempo_sr"]
+            y, sr = result
         else:
-            y = track["audio"]
+            y_multi = storage.get_track_audio(spec.track_id)
             sr = track["sr"]
-            y = y.T if y.ndim == 2 else y  # librosa -> soundfile convention
+            y = y_multi.T if y_multi.ndim == 2 else y_multi
 
         if target_sr is None:
             target_sr = sr
@@ -201,3 +209,68 @@ def export_mix(req: ExportRequest):
         media_type="audio/wav",
         headers={"Content-Disposition": 'attachment; filename="runify-mix.wav"'},
     )
+
+
+_PLAYLIST_NAME_RE = re.compile(r"^[\w\- ]{1,100}$")
+
+
+def _safe_playlist_name(name: str) -> str:
+    name = name.strip()
+    if not name or not _PLAYLIST_NAME_RE.match(name):
+        raise HTTPException(400, "Playlist name must be 1-100 characters: letters, numbers, spaces, - or _")
+    return name
+
+
+class PlaylistTrackSpec(BaseModel):
+    track_id: str
+    target_bpm: float | None = None
+    version: Literal["original", "retempo"] = "original"
+
+
+class SavePlaylistRequest(BaseModel):
+    name: str
+    tracks: list[PlaylistTrackSpec]
+
+
+@app.post("/playlists")
+def save_playlist(req: SavePlaylistRequest):
+    name = _safe_playlist_name(req.name)
+    path = storage.PLAYLISTS_DIR / f"{name}.json"
+    path.write_text(
+        SavePlaylistRequest(name=name, tracks=req.tracks).model_dump_json(),
+    )
+    return {"name": name}
+
+
+@app.get("/playlists")
+def list_playlists():
+    names = sorted((p.stem for p in storage.PLAYLISTS_DIR.glob("*.json")), key=str.lower)
+    return {"playlists": names}
+
+
+@app.get("/playlists/{name}")
+def load_playlist(name: str):
+    name = _safe_playlist_name(name)
+    path = storage.PLAYLISTS_DIR / f"{name}.json"
+    if not path.exists():
+        raise HTTPException(404, "Playlist not found")
+
+    saved = SavePlaylistRequest.model_validate_json(path.read_text())
+
+    enriched = []
+    for t in saved.tracks:
+        track = get_track(t.track_id)
+        if not track:
+            continue  # referenced track's files no longer exist on disk
+        enriched.append(
+            {
+                "track_id": t.track_id,
+                "target_bpm": t.target_bpm,
+                "version": t.version,
+                "filename": track["filename"],
+                "bpm": track["bpm"],
+                "key": track["key"],
+                "duration": track["duration"],
+            }
+        )
+    return {"name": name, "tracks": enriched}
