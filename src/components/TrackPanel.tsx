@@ -18,6 +18,32 @@ export interface TrackPanelHandle {
   applyTempo: (bpm: number) => void
 }
 
+// BPM detection (and DJ tempo-matching in general) is ambiguous at
+// half/double time -- a track flagged at 83 could just as validly be felt
+// as 166. When applying one target to a whole queue, snap to whichever
+// octave of the target (target, target/2, target*2, target/4, target*4)
+// is proportionally closest to this track's own detected BPM, rather than
+// always stretching to the literal target -- e.g. an 83 BPM track with a
+// 160 BPM target retempos to 80 (a ~4% adjustment) instead of 160 (a ~93%
+// stretch that would sound wrecked and defeats the point).
+function nearestOctaveTarget(trackBpm: number, targetBpm: number): number {
+  if (!trackBpm || trackBpm <= 0) return targetBpm
+  // Literal target checked first so an exact tie (e.g. 120 vs. a 160
+  // target, equidistant from both 80 and 160) keeps the literal target
+  // instead of arbitrarily picking a shifted one.
+  const candidates = [targetBpm, targetBpm / 2, targetBpm * 2, targetBpm / 4, targetBpm * 4]
+  let best = targetBpm
+  let bestDiff = Infinity
+  for (const c of candidates) {
+    const diff = Math.abs(c - trackBpm) / trackBpm
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = c
+    }
+  }
+  return best
+}
+
 interface TrackPanelProps {
   index: number
   totalTracks: number
@@ -138,7 +164,8 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
 
   useImperativeHandle(ref, () => ({
     applyTempo: (bpm: number) => {
-      void applyRetempo(bpm)
+      const effectiveBpm = track ? nearestOctaveTarget(track.bpm, bpm) : bpm
+      void applyRetempo(effectiveBpm)
     },
   }))
 
