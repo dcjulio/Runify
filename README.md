@@ -11,7 +11,9 @@ Everything runs locally. Nothing is uploaded anywhere.
 
 ## Running it
 
-Two servers, two terminals.
+**Quick start:** double-click `start-runify.bat`. It opens the backend and frontend each in their own terminal window and opens the app in your browser once both are up. Close either window (or Ctrl+C inside it) to stop that server.
+
+**Manual start** (same thing, by hand): two servers, two terminals.
 
 **Backend:**
 
