@@ -45,6 +45,19 @@ function nearestOctaveTarget(trackBpm: number, targetBpm: number): number {
   return best
 }
 
+type BpmJumpSeverity = 'none' | 'mild' | 'strong'
+
+// Time-stretch artifacts scale with percentage change, not raw BPM count.
+// Thresholds are a starting point, not a hard science -- adjust if they
+// feel wrong in practice.
+function bpmJumpSeverity(originalBpm: number, targetBpm: number): BpmJumpSeverity {
+  if (!originalBpm || originalBpm <= 0) return 'none'
+  const pct = (Math.abs(targetBpm - originalBpm) / originalBpm) * 100
+  if (pct >= 25) return 'strong'
+  if (pct >= 10) return 'mild'
+  return 'none'
+}
+
 interface TrackPanelProps {
   index: number
   totalTracks: number
@@ -335,6 +348,12 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
             <button type="button" onClick={handleApplyRetempo} disabled={retempoing}>
               {retempoing ? 'Rendering…' : 'Apply'}
             </button>
+            {(() => {
+              const severity = bpmJumpSeverity(track.bpm, targetBpm)
+              if (severity === 'none') return null
+              const pct = Math.round((Math.abs(targetBpm - track.bpm) / track.bpm) * 100)
+              return <span className={`bpm-warning ${severity}`}>⚠ {pct}% jump</span>
+            })()}
             {retempoUrl && (
               <span className="retempo-badge">
                 {viewMode === 'retempo' ? 'viewing retempoed' : 'viewing original'}
