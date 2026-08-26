@@ -8,6 +8,7 @@ import {
   savePlaylist,
 } from './api'
 import { TrackPanel, type TrackPanelHandle, type TrackStatus } from './components/TrackPanel'
+import { formatDuration } from './utils'
 import './App.css'
 
 function App() {
@@ -87,6 +88,8 @@ function App() {
   const readyTracks = slots
     .map((id) => statuses[id])
     .filter((s): s is TrackStatus & { trackId: string } => !!s?.trackId)
+
+  const totalDuration = readyTracks.reduce((sum, s) => sum + (s.duration ?? 0), 0)
 
   function handleApplyToAll() {
     slots.forEach((id) => {
@@ -272,7 +275,9 @@ function App() {
             onClick={handleExportMix}
             disabled={readyTracks.length === 0 || exporting}
           >
-            {exporting ? 'Exporting…' : `Export mix (${readyTracks.length} track${readyTracks.length === 1 ? '' : 's'})`}
+            {exporting
+              ? 'Exporting…'
+              : `Export mix (${readyTracks.length} track${readyTracks.length === 1 ? '' : 's'}, ${formatDuration(totalDuration)})`}
           </button>
           {exportError && <p className="error">{exportError}</p>}
         </div>

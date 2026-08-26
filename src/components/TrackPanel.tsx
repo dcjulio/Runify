@@ -11,10 +11,12 @@ import {
   trackAudioUrl,
   uploadTrack,
 } from '../api'
+import { formatDuration } from '../utils'
 
 export interface TrackStatus {
   trackId: string | null
   version: TrackVersion
+  duration: number | null
 }
 
 export interface TrackPanelHandle {
@@ -52,13 +54,6 @@ function nearestOctaveTarget(trackBpm: number, targetBpm: number): number {
 // to the backend for retempo ratios etc.) stay precise.
 function formatBpm(n: number): number {
   return Math.round(n)
-}
-
-function formatDuration(seconds: number): string {
-  const total = Math.round(seconds)
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  return `${m}:${String(s).padStart(2, '0')}`
 }
 
 type BpmJumpSeverity = 'none' | 'mild' | 'strong'
@@ -103,9 +98,11 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   const [bpmInput, setBpmInput] = useState('')
 
   useEffect(() => {
-    onStatusChange({ trackId: track?.track_id ?? null, version: viewMode })
+    const duration =
+      viewMode === 'retempo' && retempoDuration !== null ? retempoDuration : (track?.duration ?? null)
+    onStatusChange({ trackId: track?.track_id ?? null, version: viewMode, duration })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track, viewMode])
+  }, [track, viewMode, retempoDuration])
 
   useEffect(() => {
     setPositionInput(String(index + 1))
