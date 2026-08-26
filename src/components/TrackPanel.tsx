@@ -138,6 +138,10 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     try {
       await correctTrackBpm(track.track_id, n)
       setTrack({ ...track, bpm: n })
+      // keep Target BPM following the new reference, same as upload/load --
+      // otherwise it's left pointing at the old (now wrong) tempo, which
+      // shows a bogus jump warning and would retempo to the wrong target
+      setTargetBpm(formatBpm(n))
       // any existing retempo render was computed against the old (now
       // wrong) reference tempo -- the backend already discarded it, so
       // drop it here too rather than leave a stale view/url around
@@ -158,6 +162,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     try {
       const result = await resetTrackBpm(track.track_id)
       setTrack({ ...track, bpm: result.bpm })
+      setTargetBpm(formatBpm(result.bpm))
       setRetempoUrl(null)
       setRetempoBpm(null)
       setRetempoDuration(null)
