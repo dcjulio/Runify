@@ -54,6 +54,13 @@ function formatBpm(n: number): number {
   return Math.round(n)
 }
 
+function formatDuration(seconds: number): string {
+  const total = Math.round(seconds)
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 type BpmJumpSeverity = 'none' | 'mild' | 'strong'
 
 // Time-stretch artifacts scale with percentage change, not raw BPM count.
@@ -413,12 +420,12 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
             </div>
             <div className="stat">
               <span className="stat-label">Duration @ {formatBpm(track.bpm)} bpm</span>
-              <span className="stat-value">{Math.round(track.duration)}s</span>
+              <span className="stat-value">{formatDuration(track.duration)}</span>
             </div>
             {retempoDuration !== null && retempoBpm !== null && (
               <div className="stat">
                 <span className="stat-label">Duration @ {formatBpm(retempoBpm)} bpm</span>
-                <span className="stat-value">{retempoDuration.toFixed(1)}s</span>
+                <span className="stat-value">{formatDuration(retempoDuration)}</span>
               </div>
             )}
           </div>
