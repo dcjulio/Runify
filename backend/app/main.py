@@ -238,8 +238,6 @@ def _safe_playlist_name(name: str) -> str:
 
 class PlaylistTrackSpec(BaseModel):
     track_id: str
-    target_bpm: float | None = None
-    version: Literal["original", "retempo"] = "original"
 
 
 class SavePlaylistRequest(BaseModel):
@@ -280,8 +278,6 @@ def load_playlist(name: str):
         enriched.append(
             {
                 "track_id": t.track_id,
-                "target_bpm": t.target_bpm,
-                "version": t.version,
                 "filename": track["filename"],
                 "bpm": track["bpm"],
                 "key": track["key"],

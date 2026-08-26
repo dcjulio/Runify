@@ -13,7 +13,6 @@ import {
 export interface TrackStatus {
   trackId: string | null
   version: TrackVersion
-  targetBpm: number | null
 }
 
 export interface TrackPanelHandle {
@@ -74,9 +73,9 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   const [lastFile, setLastFile] = useState<File | null>(null)
 
   useEffect(() => {
-    onStatusChange({ trackId: track?.track_id ?? null, version: viewMode, targetBpm: retempoBpm })
+    onStatusChange({ trackId: track?.track_id ?? null, version: viewMode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track, viewMode, retempoBpm])
+  }, [track, viewMode])
 
   useEffect(() => {
     setPositionInput(String(index + 1))
@@ -134,6 +133,10 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   }
 
   async function hydrateExisting(t: LoadedPlaylistTrack) {
+    // Saved mixes only remember track identity and order, not any retempo
+    // -- re-apply BPM changes yourself after loading (Apply to all makes
+    // that quick). Keeps this to one simple, reliable thing: same songs,
+    // same order, every time.
     const info: TrackInfo = {
       track_id: t.track_id,
       filename: t.filename,
@@ -142,17 +145,8 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
       duration: t.duration,
     }
     setTrack(info)
-    setTargetBpm(t.target_bpm ?? t.bpm)
-    // Load only the version we're actually going to end up showing --
-    // loading the original first and then immediately replacing it with
-    // the retempo waveform was wasteful, and combined with StrictMode's
-    // double-invoke of this effect (see below) could race and leave the
-    // original waveform showing instead of the retempo one.
-    if (t.version === 'retempo' && t.target_bpm !== null) {
-      await applyRetempo(t.track_id, t.target_bpm)
-    } else {
-      await wavesurferRef.current?.load(trackAudioUrl(t.track_id))
-    }
+    setTargetBpm(t.bpm)
+    await wavesurferRef.current?.load(trackAudioUrl(t.track_id))
   }
 
   const seededRef = useRef(false)

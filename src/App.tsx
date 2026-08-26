@@ -122,7 +122,7 @@ function App() {
     try {
       await savePlaylist(
         name,
-        readyTracks.map((s) => ({ track_id: s.trackId, target_bpm: s.targetBpm, version: s.version })),
+        readyTracks.map((s) => ({ track_id: s.trackId })),
       )
       await refreshPlaylistNames()
     } catch (err) {

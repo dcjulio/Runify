@@ -62,8 +62,6 @@ export async function exportMix(tracks: ExportTrackSpec[]): Promise<Blob> {
 
 export interface PlaylistTrackSpec {
   track_id: string
-  target_bpm: number | null
-  version: TrackVersion
 }
 
 export async function savePlaylist(name: string, tracks: PlaylistTrackSpec[]): Promise<void> {
@@ -88,8 +86,6 @@ export async function listPlaylists(): Promise<string[]> {
 
 export interface LoadedPlaylistTrack {
   track_id: string
-  target_bpm: number | null
-  version: TrackVersion
   filename: string
   bpm: number
   key: string
