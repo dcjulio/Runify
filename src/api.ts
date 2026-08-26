@@ -109,13 +109,13 @@ export async function exportMix(tracks: ExportTrackSpec[]): Promise<Blob> {
   return res.blob()
 }
 
-export interface PlaylistTrackSpec {
+export interface MixTrackSpec {
   track_id: string
   filename: string
 }
 
-export async function savePlaylist(name: string, tracks: PlaylistTrackSpec[]): Promise<void> {
-  const res = await fetch(`${BASE_URL}/playlists`, {
+export async function saveMix(name: string, tracks: MixTrackSpec[]): Promise<void> {
+  const res = await fetch(`${BASE_URL}/mixes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, tracks }),
@@ -125,16 +125,16 @@ export async function savePlaylist(name: string, tracks: PlaylistTrackSpec[]): P
   }
 }
 
-export async function listPlaylists(): Promise<string[]> {
-  const res = await fetch(`${BASE_URL}/playlists`)
+export async function listMixes(): Promise<string[]> {
+  const res = await fetch(`${BASE_URL}/mixes`)
   if (!res.ok) {
     throw new Error(`Failed to list saved mixes: ${res.status} ${await res.text()}`)
   }
   const data = await res.json()
-  return data.playlists
+  return data.mixes
 }
 
-export interface LoadedPlaylistTrack {
+export interface LoadedMixTrack {
   track_id: string
   filename: string
   bpm: number
@@ -143,18 +143,18 @@ export interface LoadedPlaylistTrack {
   duration: number
 }
 
-export async function loadPlaylist(
+export async function loadMix(
   name: string,
-): Promise<{ name: string; tracks: LoadedPlaylistTrack[]; missing: string[] }> {
-  const res = await fetch(`${BASE_URL}/playlists/${encodeURIComponent(name)}`)
+): Promise<{ name: string; tracks: LoadedMixTrack[]; missing: string[] }> {
+  const res = await fetch(`${BASE_URL}/mixes/${encodeURIComponent(name)}`)
   if (!res.ok) {
     throw new Error(`Load mix failed: ${res.status} ${await res.text()}`)
   }
   return res.json()
 }
 
-export async function openPlaylistsFolder(): Promise<void> {
-  const res = await fetch(`${BASE_URL}/playlists/open-folder`, { method: 'POST' })
+export async function openMixesFolder(): Promise<void> {
+  const res = await fetch(`${BASE_URL}/mixes/open-folder`, { method: 'POST' })
   if (!res.ok) {
     throw new Error(`Couldn't open the folder: ${res.status} ${await res.text()}`)
   }

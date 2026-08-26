@@ -21,7 +21,7 @@ from .storage import get_track, track_dir, tracks
 async def lifespan(app: FastAPI):
     # Repopulate tracks from previously uploaded files on disk -- otherwise
     # every restart (which --reload triggers on every backend edit) wipes
-    # the in-memory index and breaks any saved playlist referencing them.
+    # the in-memory index and breaks any saved mix referencing them.
     storage.rebuild_tracks_from_disk()
 
     # detect_bpm and detect_key run concurrently in worker threads per
@@ -163,8 +163,8 @@ async def analyze_library_track(track_id: str):
 def open_library_folder():
     """Opens the My Songs folder in the OS file explorer so the user can
     drop downloaded music into it. Same local-only caveat as
-    open_playlists_folder below."""
-    os.startfile(storage.LIBRARY_DIR)  # noqa: S606 -- local-only tool, see open_playlists_folder
+    open_mixes_folder below."""
+    os.startfile(storage.LIBRARY_DIR)  # noqa: S606 -- local-only tool, see open_mixes_folder
     _bring_explorer_to_front()
     return {"status": "ok"}
 
@@ -329,17 +329,17 @@ def export_mix(req: ExportRequest):
     )
 
 
-_PLAYLIST_NAME_RE = re.compile(r"^[\w\- ]{1,100}$")
+_MIX_NAME_RE = re.compile(r"^[\w\- ]{1,100}$")
 
 
-def _safe_playlist_name(name: str) -> str:
+def _safe_mix_name(name: str) -> str:
     name = name.strip()
-    if not name or not _PLAYLIST_NAME_RE.match(name):
-        raise HTTPException(400, "Playlist name must be 1-100 characters: letters, numbers, spaces, - or _")
+    if not name or not _MIX_NAME_RE.match(name):
+        raise HTTPException(400, "Mix name must be 1-100 characters: letters, numbers, spaces, - or _")
     return name
 
 
-class PlaylistTrackSpec(BaseModel):
+class MixTrackSpec(BaseModel):
     track_id: str
     # kept alongside track_id purely so a missing track (moved/renamed out
     # of the library, see track_id_for_path) can still be named in a
@@ -348,35 +348,35 @@ class PlaylistTrackSpec(BaseModel):
     filename: str
 
 
-class SavePlaylistRequest(BaseModel):
+class SaveMixRequest(BaseModel):
     name: str
-    tracks: list[PlaylistTrackSpec]
+    tracks: list[MixTrackSpec]
 
 
-@app.post("/playlists")
-def save_playlist(req: SavePlaylistRequest):
-    name = _safe_playlist_name(req.name)
-    path = storage.PLAYLISTS_DIR / f"{name}.json"
+@app.post("/mixes")
+def save_mix(req: SaveMixRequest):
+    name = _safe_mix_name(req.name)
+    path = storage.MIXES_DIR / f"{name}.json"
     path.write_text(
-        SavePlaylistRequest(name=name, tracks=req.tracks).model_dump_json(),
+        SaveMixRequest(name=name, tracks=req.tracks).model_dump_json(),
     )
     return {"name": name}
 
 
-@app.get("/playlists")
-def list_playlists():
-    names = sorted((p.stem for p in storage.PLAYLISTS_DIR.glob("*.json")), key=str.lower)
-    return {"playlists": names}
+@app.get("/mixes")
+def list_mixes():
+    names = sorted((p.stem for p in storage.MIXES_DIR.glob("*.json")), key=str.lower)
+    return {"mixes": names}
 
 
-@app.get("/playlists/{name}")
-def load_playlist(name: str):
-    name = _safe_playlist_name(name)
-    path = storage.PLAYLISTS_DIR / f"{name}.json"
+@app.get("/mixes/{name}")
+def load_mix(name: str):
+    name = _safe_mix_name(name)
+    path = storage.MIXES_DIR / f"{name}.json"
     if not path.exists():
-        raise HTTPException(404, "Playlist not found")
+        raise HTTPException(404, "Mix not found")
 
-    saved = SavePlaylistRequest.model_validate_json(path.read_text())
+    saved = SaveMixRequest.model_validate_json(path.read_text())
 
     enriched = []
     missing = []
@@ -402,13 +402,13 @@ def load_playlist(name: str):
     return {"name": name, "tracks": enriched, "missing": missing}
 
 
-@app.post("/playlists/open-folder")
-def open_playlists_folder():
-    """Opens backend/playlists/ in the OS file explorer, and brings it to
+@app.post("/mixes/open-folder")
+def open_mixes_folder():
+    """Opens backend/mixes/ in the OS file explorer, and brings it to
     the front. Only meaningful because this backend always runs locally on
     the same machine as the person using it -- never do this in a real
     multi-user web app."""
-    os.startfile(storage.PLAYLISTS_DIR)  # noqa: S606 -- local-only tool, see above
+    os.startfile(storage.MIXES_DIR)  # noqa: S606 -- local-only tool, see above
     _bring_explorer_to_front()
     return {"status": "ok"}
 

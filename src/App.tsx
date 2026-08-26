@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  type LibraryEntry,
-  type LoadedPlaylistTrack,
+  type LoadedMixTrack,
   exportMix,
-  listLibrary,
-  listPlaylists,
-  loadPlaylist,
-  openLibraryFolder,
-  openPlaylistsFolder,
-  savePlaylist,
+  listMixes,
+  loadMix,
+  openMixesFolder,
+  saveMix,
 } from './api'
+import { LibraryPicker } from './components/LibraryPicker'
 import { TrackPanel, type TrackPanelHandle, type TrackStatus } from './components/TrackPanel'
 import { formatDuration } from './utils'
 import './App.css'
@@ -17,64 +15,41 @@ import './App.css'
 function App() {
   const [slots, setSlots] = useState<string[]>([])
   const [initialLibraryTrackIds, setInitialLibraryTrackIds] = useState<Record<string, string>>({})
-  const [existingTracks, setExistingTracks] = useState<Record<string, LoadedPlaylistTrack>>({})
+  const [existingTracks, setExistingTracks] = useState<Record<string, LoadedMixTrack>>({})
   const [statuses, setStatuses] = useState<Record<string, TrackStatus>>({})
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [globalTargetBpm, setGlobalTargetBpm] = useState<number>(120)
 
-  const [playlistNames, setPlaylistNames] = useState<string[]>([])
+  const [mixNames, setMixNames] = useState<string[]>([])
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
-  const [selectedPlaylist, setSelectedPlaylist] = useState('')
-  const [loadingPlaylist, setLoadingPlaylist] = useState(false)
-  const [playlistError, setPlaylistError] = useState<string | null>(null)
+  const [selectedMix, setSelectedMix] = useState('')
+  const [loadingMix, setLoadingMix] = useState(false)
+  const [mixError, setMixError] = useState<string | null>(null)
   const [missingTracks, setMissingTracks] = useState<string[]>([])
 
-  const [libraryPath, setLibraryPath] = useState('')
-  const [libraryEntries, setLibraryEntries] = useState<LibraryEntry[]>([])
-  const [libraryError, setLibraryError] = useState<string | null>(null)
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false)
 
   const panelRefs = useRef<Record<string, TrackPanelHandle | null>>({})
 
-  async function refreshPlaylistNames() {
+  async function refreshMixNames() {
     try {
-      const names = await listPlaylists()
-      setPlaylistNames(names)
+      const names = await listMixes()
+      setMixNames(names)
     } catch {
       // non-critical, just leave the list as-is
     }
   }
 
-  async function refreshLibrary() {
-    try {
-      const data = await listLibrary()
-      setLibraryPath(data.path)
-      setLibraryEntries(data.tracks)
-      setLibraryError(null)
-    } catch (err) {
-      setLibraryError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
   useEffect(() => {
-    void refreshPlaylistNames()
-    void refreshLibrary()
+    void refreshMixNames()
   }, [])
 
   function handleAddFromLibrary(trackId: string) {
     const newId = crypto.randomUUID()
     setSlots((prev) => [...prev, newId])
     setInitialLibraryTrackIds((prev) => ({ ...prev, [newId]: trackId }))
-  }
-
-  async function handleOpenLibraryFolder() {
-    setLibraryError(null)
-    try {
-      await openLibraryFolder()
-    } catch (err) {
-      setLibraryError(err instanceof Error ? err.message : String(err))
-    }
   }
 
   function removeSlot(id: string) {
@@ -140,33 +115,33 @@ function App() {
     const name = saveName.trim()
     if (!name || readyTracks.length === 0) return
     setSaving(true)
-    setPlaylistError(null)
+    setMixError(null)
     try {
-      await savePlaylist(
+      await saveMix(
         name,
         readyTracks.map((s) => ({ track_id: s.trackId, filename: s.filename ?? s.trackId })),
       )
-      await refreshPlaylistNames()
+      await refreshMixNames()
     } catch (err) {
-      setPlaylistError(err instanceof Error ? err.message : String(err))
+      setMixError(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)
     }
   }
 
   async function handleLoadMix() {
-    if (!selectedPlaylist) return
-    setLoadingPlaylist(true)
-    setPlaylistError(null)
+    if (!selectedMix) return
+    setLoadingMix(true)
+    setMixError(null)
     setMissingTracks([])
     try {
-      const data = await loadPlaylist(selectedPlaylist)
+      const data = await loadMix(selectedMix)
       const newIds = data.tracks.map(() => crypto.randomUUID())
       setSlots(newIds)
       setStatuses({})
       setInitialLibraryTrackIds({})
       setExistingTracks(() => {
-        const next: Record<string, LoadedPlaylistTrack> = {}
+        const next: Record<string, LoadedMixTrack> = {}
         newIds.forEach((id, i) => {
           next[id] = data.tracks[i]
         })
@@ -174,18 +149,18 @@ function App() {
       })
       setMissingTracks(data.missing)
     } catch (err) {
-      setPlaylistError(err instanceof Error ? err.message : String(err))
+      setMixError(err instanceof Error ? err.message : String(err))
     } finally {
-      setLoadingPlaylist(false)
+      setLoadingMix(false)
     }
   }
 
-  async function handleOpenPlaylistsFolder() {
-    setPlaylistError(null)
+  async function handleOpenMixesFolder() {
+    setMixError(null)
     try {
-      await openPlaylistsFolder()
+      await openMixesFolder()
     } catch (err) {
-      setPlaylistError(err instanceof Error ? err.message : String(err))
+      setMixError(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -196,8 +171,8 @@ function App() {
         <p className="subtitle">Build your running mix</p>
       </header>
       <main>
-        <div className="playlist-row">
-          <div className="playlist-save">
+        <div className="mix-row">
+          <div className="mix-save">
             <input
               type="text"
               placeholder="Mix name"
@@ -212,38 +187,31 @@ function App() {
               {saving ? 'Saving…' : 'Save mix'}
             </button>
           </div>
-          <div className="playlist-load">
-            <select
-              value={selectedPlaylist}
-              onChange={(e) => setSelectedPlaylist(e.target.value)}
-            >
+          <div className="mix-load">
+            <select value={selectedMix} onChange={(e) => setSelectedMix(e.target.value)}>
               <option value="">
-                {playlistNames.length === 0 ? 'No saved mixes' : 'Choose a saved mix…'}
+                {mixNames.length === 0 ? 'No saved mixes' : 'Choose a saved mix…'}
               </option>
-              {playlistNames.map((name) => (
+              {mixNames.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={handleLoadMix}
-              disabled={!selectedPlaylist || loadingPlaylist}
-            >
-              {loadingPlaylist ? 'Loading…' : 'Load mix'}
+            <button type="button" onClick={handleLoadMix} disabled={!selectedMix || loadingMix}>
+              {loadingMix ? 'Loading…' : 'Load mix'}
             </button>
             <button
               type="button"
               className="open-folder-button"
-              onClick={handleOpenPlaylistsFolder}
+              onClick={handleOpenMixesFolder}
               title="Open the folder where mixes are saved"
             >
-              Open source folder
+              Open mix folder
             </button>
           </div>
         </div>
-        {playlistError && <p className="error">{playlistError}</p>}
+        {mixError && <p className="error">{mixError}</p>}
         {missingTracks.length > 0 && (
           <p className="mix-warning">
             {missingTracks.length} song{missingTracks.length === 1 ? '' : 's'} from this mix
@@ -285,44 +253,15 @@ function App() {
           />
         ))}
 
-        <div className="library-panel">
-          <div className="library-header">
-            <h2>My Songs</h2>
-            <button type="button" onClick={() => void refreshLibrary()}>
-              Refresh
-            </button>
-          </div>
-          {libraryError && <p className="error">{libraryError}</p>}
-          {libraryEntries.length > 0 && (
-            <ul className="library-list">
-              {libraryEntries.map((entry) => (
-                <li key={entry.track_id} className="library-item">
-                  <span className="library-filename">{entry.filename}</span>
-                  {entry.analyzed && entry.bpm !== null && (
-                    <span className="library-meta">
-                      {Math.round(entry.bpm)} BPM · {entry.key}
-                    </span>
-                  )}
-                  <button type="button" onClick={() => handleAddFromLibrary(entry.track_id)}>
-                    Add
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <button
-            type="button"
-            className="add-song-button"
-            onClick={handleOpenLibraryFolder}
-            title={libraryPath || 'Open the folder where your music lives'}
-          >
-            + Add songs
-          </button>
-          <p className="library-hint">
-            Drop your downloaded music into the My Songs folder (subfolders are fine too), then
-            hit Refresh to see it above.
-          </p>
-        </div>
+        <button type="button" className="add-song-button" onClick={() => setShowLibraryPicker(true)}>
+          + Add song(s)
+        </button>
+        {showLibraryPicker && (
+          <LibraryPicker
+            onClose={() => setShowLibraryPicker(false)}
+            onPick={handleAddFromLibrary}
+          />
+        )}
 
         <div className="export-row">
           <button

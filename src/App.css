@@ -13,6 +13,7 @@ header h1 {
   margin: 0;
   font-size: 2rem;
   letter-spacing: -0.02em;
+  color: #e6944d;
 }
 
 .subtitle {
@@ -74,29 +75,87 @@ header h1 {
   background: #ff6b6b1a;
 }
 
-.library-panel {
-  background: #1c1c26;
-  border: 1px dashed #3c3c4c;
+.add-song-button {
+  display: block;
+  width: 100%;
+  background: #6c5ce7;
+  color: white;
+  border: none;
   border-radius: 12px;
-  padding: 1.25rem;
-  margin-bottom: 1.25rem;
+  padding: 0.9rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
 }
 
-.library-header {
+.add-song-button:hover {
+  background: #5c4cd7;
+}
+
+.add-song-hint {
+  color: #e6944d;
+  font-size: 0.85rem;
+  margin: 0.6rem 0 0;
+  text-align: center;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 14, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 100;
+}
+
+.modal {
+  background: #1c1c26;
+  border: 1px solid #2c2c3a;
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
-.library-header h2 {
+.modal-header h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 600;
 }
 
-.library-header button {
+.modal-close {
+  background: transparent;
+  color: #8888a0;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+
+.modal-close:hover {
+  color: #eaeaf2;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.9rem 0 1rem;
+}
+
+.modal-actions button {
   background: #2c2c3a;
   color: #eaeaf2;
   border: 1px solid #3c3c4c;
@@ -104,38 +163,78 @@ header h1 {
   padding: 0.4rem 0.8rem;
   cursor: pointer;
   font-size: 0.8rem;
-  flex-shrink: 0;
 }
 
-.library-header button:hover {
+.modal-actions button:hover:not(:disabled) {
   background: #3c3c4c;
 }
 
-.add-song-button {
-  display: block;
-  width: 100%;
-  background: transparent;
-  color: #b5b5c8;
-  border: 1px dashed #3c3c4c;
-  border-radius: 12px;
-  padding: 0.9rem;
+.modal-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.modal-path-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.modal-back-button {
+  background: #2c2c3a;
+  color: #eaeaf2;
+  border: 1px solid #3c3c4c;
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  text-align: center;
+  font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
-.add-song-button:hover {
-  border-color: #6c5ce7;
-  color: #6c5ce7;
-  background: #6c5ce70d;
+.modal-back-button:hover:not(:disabled) {
+  background: #3c3c4c;
 }
 
-.library-hint {
+.modal-back-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.modal-path {
+  flex: 1;
+  min-width: 0;
   color: #8888a0;
-  font-size: 0.85rem;
-  margin: 0.6rem 0 0;
-  text-align: center;
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-select-all-button {
+  background: #2c2c3a;
+  color: #eaeaf2;
+  border: 1px solid #3c3c4c;
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.modal-select-all-button:hover:not(:disabled) {
+  background: #3c3c4c;
+}
+
+.modal-select-all-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.library-empty {
+  color: #8888a0;
+  font-size: 0.9rem;
+  margin: 0;
 }
 
 .library-list {
@@ -156,6 +255,28 @@ header h1 {
   padding: 0.5rem 0.75rem;
 }
 
+.library-item input[type='checkbox'] {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  accent-color: #6c5ce7;
+  cursor: pointer;
+}
+
+.library-folder {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.library-folder:hover {
+  background: #1c1c26;
+}
+
+.library-folder-chevron {
+  color: #8888a0;
+  flex-shrink: 0;
+}
+
 .library-filename {
   flex: 1;
   min-width: 0;
@@ -171,20 +292,40 @@ header h1 {
   white-space: nowrap;
 }
 
-.library-item button {
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #2c2c3a;
+}
+
+.modal-selection-count {
+  color: #8888a0;
+  font-size: 0.85rem;
+}
+
+.modal-open-button {
   background: #6c5ce7;
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 0.35rem 0.8rem;
+  border-radius: 8px;
+  padding: 0.5rem 1.2rem;
   cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 500;
-  flex-shrink: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
-.library-item button:hover {
+.modal-open-button:hover:not(:disabled) {
   background: #5c4cd7;
+}
+
+.modal-open-button:disabled {
+  background: #2c2c3a;
+  color: #6a6a7c;
+  cursor: default;
 }
 
 .export-row {
@@ -475,15 +616,15 @@ header h1 {
   border: 1px solid #ff6b6b55;
 }
 
-.playlist-row {
+.mix-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
-.playlist-save,
-.playlist-load {
+.mix-save,
+.mix-load {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -491,8 +632,8 @@ header h1 {
   min-width: 240px;
 }
 
-.playlist-save input[type='text'],
-.playlist-load select {
+.mix-save input[type='text'],
+.mix-load select {
   flex: 1;
   min-width: 0;
   padding: 0.5rem 0.7rem;
@@ -503,8 +644,8 @@ header h1 {
   font-size: 0.9rem;
 }
 
-.playlist-save button,
-.playlist-load button {
+.mix-save button,
+.mix-load button {
   background: #2c2c3a;
   color: #eaeaf2;
   border: 1px solid #3c3c4c;
@@ -516,13 +657,13 @@ header h1 {
   flex-shrink: 0;
 }
 
-.playlist-save button:hover:not(:disabled),
-.playlist-load button:hover:not(:disabled) {
+.mix-save button:hover:not(:disabled),
+.mix-load button:hover:not(:disabled) {
   background: #3c3c4c;
 }
 
-.playlist-save button:disabled,
-.playlist-load button:disabled {
+.mix-save button:disabled,
+.mix-load button:disabled {
   opacity: 0.5;
   cursor: default;
 }

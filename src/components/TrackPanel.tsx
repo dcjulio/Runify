@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import {
-  type LoadedPlaylistTrack,
+  type LoadedMixTrack,
   type TrackInfo,
   type TrackVersion,
   analyzeLibraryTrack,
@@ -74,7 +74,7 @@ interface TrackPanelProps {
   index: number
   totalTracks: number
   initialLibraryTrackId?: string
-  existingTrack?: LoadedPlaylistTrack
+  existingTrack?: LoadedMixTrack
   onRemove: () => void
   onMove: (newPosition: number) => void
   onStatusChange: (status: TrackStatus) => void
@@ -221,7 +221,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     }
   }
 
-  async function hydrateExisting(t: LoadedPlaylistTrack) {
+  async function hydrateExisting(t: LoadedMixTrack) {
     // Saved mixes only remember track identity and order, not any retempo
     // -- re-apply BPM changes yourself after loading (Apply to all makes
     // that quick). Keeps this to one simple, reliable thing: same songs,

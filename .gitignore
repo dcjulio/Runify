@@ -33,7 +33,7 @@ dist-ssr
 # Python backend
 backend/.venv/
 backend/data/
-backend/playlists/
+backend/mixes/
 __pycache__/
 *.pyc
 

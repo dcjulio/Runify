@@ -8,8 +8,8 @@ import soundfile as sf
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-PLAYLISTS_DIR = Path(__file__).resolve().parent.parent / "playlists"
-PLAYLISTS_DIR.mkdir(exist_ok=True)
+MIXES_DIR = Path(__file__).resolve().parent.parent / "mixes"
+MIXES_DIR.mkdir(exist_ok=True)
 
 # Where the user drops their own downloaded music (via Explorer, outside the
 # app), sitting right next to the project itself. Tracks are picked from
@@ -63,7 +63,7 @@ def save_track_meta(track_id: str) -> None:
 def rebuild_tracks_from_disk() -> None:
     """Repopulate the in-memory track index from meta.json sidecars on
     disk. Runs at server startup so tracks analyzed in a previous run (and
-    any saved playlists referencing them) are still there without
+    any saved mixes referencing them) are still there without
     re-analyzing -- the in-memory dict is otherwise wiped by every
     restart. Decoded audio is deliberately NOT reloaded here (expensive
     for a whole library); it's lazily decoded on first actual use by
