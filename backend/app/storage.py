@@ -120,3 +120,16 @@ def get_track_retempo_bpm(track_id: str) -> float | None:
 
 def save_track_retempo_bpm(track_id: str, target_bpm: float) -> None:
     (track_dir(track_id) / "retempo_meta.json").write_text(json.dumps({"target_bpm": target_bpm}))
+
+
+def clear_track_retempo(track_id: str) -> None:
+    """Discards any existing retempo render for a track, in memory and on
+    disk. Used when the reference BPM changes (a manual correction) --
+    any prior render was computed against the old reference, so its
+    stretch ratio is now wrong, not just its label."""
+    track = tracks[track_id]
+    track.pop("retempo_audio", None)
+    track.pop("retempo_sr", None)
+    track.pop("retempo_bpm", None)
+    (track_dir(track_id) / "retempo.wav").unlink(missing_ok=True)
+    (track_dir(track_id) / "retempo_meta.json").unlink(missing_ok=True)

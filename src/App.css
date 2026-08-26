@@ -262,6 +262,31 @@ header h1 {
   font-weight: 600;
 }
 
+.bpm-correction-input {
+  width: 4.5rem;
+  padding: 0.1rem 0.3rem;
+  margin: -0.1rem -0.3rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #eaeaf2;
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: text;
+}
+
+.bpm-correction-input:hover {
+  border-color: #3c3c4c;
+  background: #14141c;
+}
+
+.bpm-correction-input:focus {
+  border-color: #6c5ce7;
+  background: #14141c;
+  outline: none;
+}
+
 .retempo-row {
   display: flex;
   align-items: center;

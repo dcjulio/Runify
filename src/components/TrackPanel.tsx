@@ -4,6 +4,7 @@ import {
   type LoadedPlaylistTrack,
   type TrackInfo,
   type TrackVersion,
+  correctTrackBpm,
   retempoAudioUrl,
   retempoTrack,
   trackAudioUrl,
@@ -84,6 +85,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   const [isPlaying, setIsPlaying] = useState(false)
   const [positionInput, setPositionInput] = useState(String(index + 1))
   const [lastFile, setLastFile] = useState<File | null>(null)
+  const [bpmInput, setBpmInput] = useState('')
 
   useEffect(() => {
     onStatusChange({ trackId: track?.track_id ?? null, version: viewMode })
@@ -100,6 +102,37 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
       onMove(n)
     } else {
       setPositionInput(String(index + 1))
+    }
+  }
+
+  useEffect(() => {
+    if (track) setBpmInput(String(track.bpm))
+  }, [track])
+
+  async function commitBpmCorrection() {
+    if (!track) return
+    const n = Number.parseFloat(bpmInput)
+    if (!Number.isFinite(n) || n <= 0) {
+      setBpmInput(String(track.bpm))
+      return
+    }
+    if (n === track.bpm) return
+
+    setError(null)
+    try {
+      await correctTrackBpm(track.track_id, n)
+      setTrack({ ...track, bpm: n })
+      // any existing retempo render was computed against the old (now
+      // wrong) reference tempo -- the backend already discarded it, so
+      // drop it here too rather than leave a stale view/url around
+      setRetempoUrl(null)
+      setRetempoBpm(null)
+      setRetempoDuration(null)
+      setViewMode('original')
+      await wavesurferRef.current?.load(trackAudioUrl(track.track_id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setBpmInput(String(track.bpm))
     }
   }
 
@@ -316,7 +349,20 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
           <div className="stats-row">
             <div className="stat">
               <span className="stat-label">Detected BPM</span>
-              <span className="stat-value">{track.bpm}</span>
+              <input
+                type="number"
+                className="bpm-correction-input"
+                min={20}
+                max={300}
+                step={0.01}
+                value={bpmInput}
+                onChange={(e) => setBpmInput(e.target.value)}
+                onBlur={commitBpmCorrection}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur()
+                }}
+                title="Automatically detected -- click to correct if it sounds wrong"
+              />
             </div>
             <div className="stat">
               <span className="stat-label">Key</span>

@@ -172,6 +172,31 @@ def get_retempo_audio(track_id: str):
     return FileResponse(out_path)
 
 
+class BpmCorrectionRequest(BaseModel):
+    bpm: float
+
+
+@app.put("/tracks/{track_id}/bpm")
+def correct_track_bpm(track_id: str, req: BpmCorrectionRequest):
+    """Overrides the detected BPM with one the user actually heard --
+    automatic detection occasionally gets unusual songs wrong. This value
+    is the reference every future retempo ratio, octave-match, and jump
+    warning is computed against, so any existing retempo render (computed
+    against the old, wrong reference) is no longer valid and gets
+    discarded rather than left around silently wrong."""
+    track = get_track(track_id)
+    if not track:
+        raise HTTPException(404, "Track not found")
+    if req.bpm <= 0:
+        raise HTTPException(400, "bpm must be positive")
+
+    track["bpm"] = req.bpm
+    storage.save_track_meta(track_id)
+    storage.clear_track_retempo(track_id)
+
+    return {"track_id": track_id, "bpm": req.bpm}
+
+
 class ExportTrackSpec(BaseModel):
     track_id: str
     version: Literal["original", "retempo"]

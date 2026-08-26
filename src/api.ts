@@ -41,6 +41,21 @@ export async function retempoTrack(
   return res.json()
 }
 
+export async function correctTrackBpm(
+  trackId: string,
+  bpm: number,
+): Promise<{ track_id: string; bpm: number }> {
+  const res = await fetch(`${BASE_URL}/tracks/${trackId}/bpm`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bpm }),
+  })
+  if (!res.ok) {
+    throw new Error(`BPM correction failed: ${res.status} ${await res.text()}`)
+  }
+  return res.json()
+}
+
 export type TrackVersion = 'original' | 'retempo'
 
 export interface ExportTrackSpec {
