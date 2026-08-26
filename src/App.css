@@ -263,3 +263,46 @@ header h1 {
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
 }
+
+.global-tempo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #1c1c26;
+  border: 1px solid #6c5ce755;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.global-tempo-row label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #eaeaf2;
+}
+
+.global-tempo-row input[type='number'] {
+  width: 5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #3c3c4c;
+  background: #14141c;
+  color: #eaeaf2;
+  font-size: 0.95rem;
+}
+
+.global-tempo-row button {
+  background: #6c5ce7;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+.global-tempo-row button:hover {
+  background: #5c4cd7;
+}

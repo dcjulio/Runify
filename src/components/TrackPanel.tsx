@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import {
   type TrackInfo,
@@ -14,6 +14,10 @@ export interface TrackStatus {
   version: TrackVersion
 }
 
+export interface TrackPanelHandle {
+  applyTempo: (bpm: number) => void
+}
+
 interface TrackPanelProps {
   index: number
   initialFile?: File
@@ -21,7 +25,10 @@ interface TrackPanelProps {
   onStatusChange: (status: TrackStatus) => void
 }
 
-export function TrackPanel({ index, initialFile, onRemove, onStatusChange }: TrackPanelProps) {
+export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function TrackPanel(
+  { index, initialFile, onRemove, onStatusChange },
+  ref,
+) {
   const [track, setTrack] = useState<TrackInfo | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -87,16 +94,17 @@ export function TrackPanel({ index, initialFile, onRemove, onStatusChange }: Tra
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function handleApplyRetempo() {
+  async function applyRetempo(bpm: number) {
     if (!track) return
+    setTargetBpm(bpm)
     setRetempoing(true)
     setError(null)
     try {
-      const result = await retempoTrack(track.track_id, targetBpm)
+      const result = await retempoTrack(track.track_id, bpm)
       const url = `${retempoAudioUrl(track.track_id)}?t=${Date.now()}`
       await wavesurferRef.current?.load(url)
       setRetempoUrl(url)
-      setRetempoBpm(targetBpm)
+      setRetempoBpm(bpm)
       setRetempoDuration(result.duration)
       setViewMode('retempo')
     } catch (err) {
@@ -105,6 +113,16 @@ export function TrackPanel({ index, initialFile, onRemove, onStatusChange }: Tra
       setRetempoing(false)
     }
   }
+
+  function handleApplyRetempo() {
+    void applyRetempo(targetBpm)
+  }
+
+  useImperativeHandle(ref, () => ({
+    applyTempo: (bpm: number) => {
+      void applyRetempo(bpm)
+    },
+  }))
 
   async function handleShowOriginal() {
     if (!track || viewMode === 'original') return
@@ -214,4 +232,4 @@ export function TrackPanel({ index, initialFile, onRemove, onStatusChange }: Tra
       )}
     </div>
   )
-}
+})
