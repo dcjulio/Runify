@@ -370,7 +370,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
               <div className="bpm-value-row">
                 <input
                   type="number"
-                  className="bpm-correction-input"
+                  className={`bpm-correction-input${track.bpm !== track.detected_bpm ? ' corrected' : ''}`}
                   min={20}
                   max={300}
                   step={0.01}

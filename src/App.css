@@ -264,11 +264,10 @@ header h1 {
 
 .bpm-correction-input {
   width: 4.5rem;
-  padding: 0.1rem 0.3rem;
-  margin: -0.1rem -0.3rem;
+  padding: 0.15rem 0.4rem;
   border-radius: 6px;
-  border: 1px solid transparent;
-  background: transparent;
+  border: 1px solid #3c3c4c;
+  background: #1c1c26;
   color: #eaeaf2;
   font-size: 1.15rem;
   font-weight: 600;
@@ -277,14 +276,18 @@ header h1 {
 }
 
 .bpm-correction-input:hover {
-  border-color: #3c3c4c;
-  background: #14141c;
+  border-color: #5c5c6c;
 }
 
 .bpm-correction-input:focus {
   border-color: #6c5ce7;
-  background: #14141c;
   outline: none;
+}
+
+.bpm-correction-input.corrected {
+  border-color: #6c5ce7;
+  background: #6c5ce71a;
+  color: #a996ff;
 }
 
 .bpm-value-row {
