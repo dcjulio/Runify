@@ -153,19 +153,29 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
 
   useEffect(() => {
     // StrictMode (see main.tsx) deliberately mounts, unmounts, and
-    // remounts every component once in dev, re-running "on mount" effects
-    // twice. Without this guard, hydrateExisting/uploadFile would fire
-    // twice concurrently for the same track -- refs survive that simulated
-    // cycle (state does too), so checking one here reliably makes only the
-    // first invocation actually do anything.
+    // remounts every component once in dev -- including the wavesurfer
+    // instance itself (created in the effect above): a first instance gets
+    // created, destroyed, then a second one created, all synchronously, as
+    // a dev-mode check. If loading a track starts inside that same
+    // synchronous window, it targets whichever instance existed at that
+    // exact moment -- which can be the first one, right before it's
+    // destroyed, leaving the surviving instance with nothing loaded (no
+    // waveform, unplayable). A zero-delay timer defers the actual load
+    // until after that synchronous dance has fully settled, so it always
+    // targets the instance that actually survives.
+    //
+    // The seededRef guard (refs survive the simulated cycle) still makes
+    // sure only one of the two setup passes schedules anything at all.
     if (seededRef.current) return
     seededRef.current = true
 
-    if (initialFile) {
-      void uploadFile(initialFile)
-    } else if (existingTrack) {
-      void hydrateExisting(existingTrack)
-    }
+    setTimeout(() => {
+      if (initialFile) {
+        void uploadFile(initialFile)
+      } else if (existingTrack) {
+        void hydrateExisting(existingTrack)
+      }
+    }, 0)
     // initialFile/existingTrack are only meant to seed this instance once,
     // on creation -- a given slot is always exactly one of "new upload" or
     // "loaded from a saved mix", never both, never changing after mount
