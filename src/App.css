@@ -35,12 +35,27 @@ header h1 {
   margin-bottom: 1rem;
 }
 
-.track-number {
+.track-position {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 0.8rem;
   font-weight: 600;
   color: #8888a0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.position-input {
+  width: 3rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+  border: 1px solid #3c3c4c;
+  background: #14141c;
+  color: #eaeaf2;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: none;
 }
 
 .remove-button {

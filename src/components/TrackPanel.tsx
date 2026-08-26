@@ -20,13 +20,15 @@ export interface TrackPanelHandle {
 
 interface TrackPanelProps {
   index: number
+  totalTracks: number
   initialFile?: File
   onRemove: () => void
+  onMove: (newPosition: number) => void
   onStatusChange: (status: TrackStatus) => void
 }
 
 export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function TrackPanel(
-  { index, initialFile, onRemove, onStatusChange },
+  { index, totalTracks, initialFile, onRemove, onMove, onStatusChange },
   ref,
 ) {
   const [track, setTrack] = useState<TrackInfo | null>(null)
@@ -39,11 +41,25 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   const [retempoDuration, setRetempoDuration] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<TrackVersion>('original')
   const [isPlaying, setIsPlaying] = useState(false)
+  const [positionInput, setPositionInput] = useState(String(index + 1))
 
   useEffect(() => {
     onStatusChange({ trackId: track?.track_id ?? null, version: viewMode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track, viewMode])
+
+  useEffect(() => {
+    setPositionInput(String(index + 1))
+  }, [index])
+
+  function commitPosition() {
+    const n = Number.parseInt(positionInput, 10)
+    if (Number.isFinite(n)) {
+      onMove(n)
+    } else {
+      setPositionInput(String(index + 1))
+    }
+  }
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const wavesurferRef = useRef<WaveSurfer | null>(null)
@@ -139,7 +155,21 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   return (
     <div className="track-panel">
       <div className="track-panel-header">
-        <span className="track-number">Track {index + 1}</span>
+        <div className="track-position">
+          <span>Track</span>
+          <input
+            type="number"
+            className="position-input"
+            min={1}
+            max={totalTracks}
+            value={positionInput}
+            onChange={(e) => setPositionInput(e.target.value)}
+            onBlur={commitPosition}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+            }}
+          />
+        </div>
         <button type="button" className="remove-button" onClick={onRemove}>
           Remove
         </button>

@@ -43,6 +43,19 @@ function App() {
     setStatuses((prev) => ({ ...prev, [id]: status }))
   }
 
+  function moveSlot(id: string, newPosition: number) {
+    setSlots((prev) => {
+      const currentIndex = prev.indexOf(id)
+      if (currentIndex === -1) return prev
+      const target = Math.min(Math.max(newPosition, 1), prev.length) - 1
+      if (target === currentIndex) return prev
+      const next = [...prev]
+      next.splice(currentIndex, 1)
+      next.splice(target, 0, id)
+      return next
+    })
+  }
+
   const readyTracks = slots
     .map((id) => statuses[id])
     .filter((s): s is TrackStatus & { trackId: string } => !!s?.trackId)
@@ -105,8 +118,10 @@ function App() {
               panelRefs.current[id] = el
             }}
             index={index}
+            totalTracks={slots.length}
             initialFile={initialFiles[id]}
             onRemove={() => removeSlot(id)}
+            onMove={(newPosition) => moveSlot(id, newPosition)}
             onStatusChange={(status) => updateStatus(id, status)}
           />
         ))}
