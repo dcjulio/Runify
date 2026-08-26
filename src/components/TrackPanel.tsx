@@ -413,7 +413,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
             </div>
             <div className="stat">
               <span className="stat-label">Duration @ {formatBpm(track.bpm)} bpm</span>
-              <span className="stat-value">{track.duration.toFixed(1)}s</span>
+              <span className="stat-value">{Math.round(track.duration)}s</span>
             </div>
             {retempoDuration !== null && retempoBpm !== null && (
               <div className="stat">
