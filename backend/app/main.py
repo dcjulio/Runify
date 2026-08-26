@@ -2,16 +2,13 @@ import asyncio
 import io
 import os
 import re
-import shutil
-import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Literal
 
 import librosa
 import numpy as np
 import soundfile as sf
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -54,20 +51,77 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/tracks")
-async def upload_track(file: UploadFile = File(...)):
-    track_id = uuid.uuid4().hex
-    tdir = track_dir(track_id)
+# Extensions librosa/soundfile can plausibly decode -- filters what shows
+# up from a library folder scan to actual audio files.
+LIBRARY_AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".wma", ".aiff"}
 
-    ext = Path(file.filename or "").suffix or ".bin"
-    original_path = tdir / f"original{ext}"
-    with original_path.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
+
+def _track_info(track_id: str, track: dict) -> dict:
+    return {
+        "track_id": track_id,
+        "filename": track["filename"],
+        "bpm": track["bpm"],
+        "detected_bpm": track["detected_bpm"],
+        "key": track["key"],
+        "duration": track["duration"],
+    }
+
+
+@app.get("/library")
+def list_library():
+    """Scans the My Songs folder and reports, for each audio file, whether
+    it's already been analyzed (and its stats if so) -- lets the frontend
+    show a pick list instead of a raw upload dialog."""
+    entries = []
+    for path in sorted(
+        storage.LIBRARY_DIR.rglob("*"),
+        key=lambda p: str(p.relative_to(storage.LIBRARY_DIR)).lower(),
+    ):
+        if not path.is_file() or path.suffix.lower() not in LIBRARY_AUDIO_EXTENSIONS:
+            continue
+        track_id = storage.track_id_for_path(path)
+        track = get_track(track_id)
+        entries.append(
+            {
+                "track_id": track_id,
+                # relative path, not just the filename, so two songs with
+                # the same name in different subfolders stay distinguishable
+                "filename": str(path.relative_to(storage.LIBRARY_DIR)),
+                "analyzed": track is not None,
+                "bpm": track["bpm"] if track else None,
+                "detected_bpm": track["detected_bpm"] if track else None,
+                "key": track["key"] if track else None,
+                "duration": track["duration"] if track else None,
+            }
+        )
+    return {"path": str(storage.LIBRARY_DIR), "tracks": entries}
+
+
+@app.post("/library/tracks/{track_id}/analyze")
+async def analyze_library_track(track_id: str):
+    """Analyzes (or, if already analyzed, just returns) a library file
+    identified by its path-derived track_id. The audio is read straight
+    from the library folder and never copied -- only the small analysis
+    result gets written to backend/data, so the library can grow without
+    backend/data growing anywhere near as fast."""
+    existing = get_track(track_id)
+    if existing:
+        return _track_info(track_id, existing)
+
+    match = next(
+        (
+            p
+            for p in storage.LIBRARY_DIR.rglob("*")
+            if p.is_file() and storage.track_id_for_path(p) == track_id
+        ),
+        None,
+    )
+    if match is None:
+        raise HTTPException(404, "Track not found in the My Songs folder (it may have been moved or renamed)")
 
     try:
-        y_multi, sr = librosa.load(original_path, sr=None, mono=False)
+        y_multi, sr = librosa.load(match, sr=None, mono=False)
     except Exception as exc:
-        shutil.rmtree(tdir, ignore_errors=True)
         raise HTTPException(400, f"Could not decode audio file: {exc}") from exc
 
     y_mono = librosa.to_mono(y_multi) if y_multi.ndim == 2 else y_multi
@@ -85,8 +139,8 @@ async def upload_track(file: UploadFile = File(...)):
     duration = librosa.get_duration(y=y_mono, sr=sr)
 
     tracks[track_id] = {
-        "original_path": original_path,
-        "filename": file.filename,
+        "original_path": match,
+        "filename": match.name,
         "bpm": bpm,
         # immutable record of what the code actually detected, kept
         # alongside "bpm" (which the user can correct) so a correction can
@@ -102,14 +156,17 @@ async def upload_track(file: UploadFile = File(...)):
     }
     storage.save_track_meta(track_id)
 
-    return {
-        "track_id": track_id,
-        "filename": file.filename,
-        "bpm": bpm,
-        "detected_bpm": bpm,
-        "key": key,
-        "duration": duration,
-    }
+    return _track_info(track_id, tracks[track_id])
+
+
+@app.post("/library/open-folder")
+def open_library_folder():
+    """Opens the My Songs folder in the OS file explorer so the user can
+    drop downloaded music into it. Same local-only caveat as
+    open_playlists_folder below."""
+    os.startfile(storage.LIBRARY_DIR)  # noqa: S606 -- local-only tool, see open_playlists_folder
+    _bring_explorer_to_front()
+    return {"status": "ok"}
 
 
 @app.get("/tracks/{track_id}/audio")
@@ -284,6 +341,11 @@ def _safe_playlist_name(name: str) -> str:
 
 class PlaylistTrackSpec(BaseModel):
     track_id: str
+    # kept alongside track_id purely so a missing track (moved/renamed out
+    # of the library, see track_id_for_path) can still be named in a
+    # warning when loading -- once it's missing, track_id alone has nothing
+    # left to look up
+    filename: str
 
 
 class SavePlaylistRequest(BaseModel):
@@ -317,10 +379,16 @@ def load_playlist(name: str):
     saved = SavePlaylistRequest.model_validate_json(path.read_text())
 
     enriched = []
+    missing = []
     for t in saved.tracks:
         track = get_track(t.track_id)
         if not track:
-            continue  # referenced track's files no longer exist on disk
+            # referenced track's file no longer exists on disk (moved,
+            # renamed, or deleted out of the library) -- report it by its
+            # saved filename so the frontend can warn instead of silently
+            # returning a shorter mix
+            missing.append(t.filename)
+            continue
         enriched.append(
             {
                 "track_id": t.track_id,
@@ -331,7 +399,7 @@ def load_playlist(name: str):
                 "duration": track["duration"],
             }
         )
-    return {"name": name, "tracks": enriched}
+    return {"name": name, "tracks": enriched, "missing": missing}
 
 
 @app.post("/playlists/open-folder")

@@ -9,14 +9,37 @@ export interface TrackInfo {
   duration: number
 }
 
-export async function uploadTrack(file: File): Promise<TrackInfo> {
-  const form = new FormData()
-  form.append('file', file)
-  const res = await fetch(`${BASE_URL}/tracks`, { method: 'POST', body: form })
+export interface LibraryEntry {
+  track_id: string
+  filename: string
+  analyzed: boolean
+  bpm: number | null
+  detected_bpm: number | null
+  key: string | null
+  duration: number | null
+}
+
+export async function listLibrary(): Promise<{ path: string; tracks: LibraryEntry[] }> {
+  const res = await fetch(`${BASE_URL}/library`)
   if (!res.ok) {
-    throw new Error(`Upload failed: ${res.status} ${await res.text()}`)
+    throw new Error(`Failed to list My Songs: ${res.status} ${await res.text()}`)
   }
   return res.json()
+}
+
+export async function analyzeLibraryTrack(trackId: string): Promise<TrackInfo> {
+  const res = await fetch(`${BASE_URL}/library/tracks/${trackId}/analyze`, { method: 'POST' })
+  if (!res.ok) {
+    throw new Error(`Couldn't analyze track: ${res.status} ${await res.text()}`)
+  }
+  return res.json()
+}
+
+export async function openLibraryFolder(): Promise<void> {
+  const res = await fetch(`${BASE_URL}/library/open-folder`, { method: 'POST' })
+  if (!res.ok) {
+    throw new Error(`Couldn't open the folder: ${res.status} ${await res.text()}`)
+  }
 }
 
 export function trackAudioUrl(trackId: string): string {
@@ -88,6 +111,7 @@ export async function exportMix(tracks: ExportTrackSpec[]): Promise<Blob> {
 
 export interface PlaylistTrackSpec {
   track_id: string
+  filename: string
 }
 
 export async function savePlaylist(name: string, tracks: PlaylistTrackSpec[]): Promise<void> {
@@ -121,7 +145,7 @@ export interface LoadedPlaylistTrack {
 
 export async function loadPlaylist(
   name: string,
-): Promise<{ name: string; tracks: LoadedPlaylistTrack[] }> {
+): Promise<{ name: string; tracks: LoadedPlaylistTrack[]; missing: string[] }> {
   const res = await fetch(`${BASE_URL}/playlists/${encodeURIComponent(name)}`)
   if (!res.ok) {
     throw new Error(`Load mix failed: ${res.status} ${await res.text()}`)

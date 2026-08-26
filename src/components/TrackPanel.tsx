@@ -4,12 +4,12 @@ import {
   type LoadedPlaylistTrack,
   type TrackInfo,
   type TrackVersion,
+  analyzeLibraryTrack,
   correctTrackBpm,
   resetTrackBpm,
   retempoAudioUrl,
   retempoTrack,
   trackAudioUrl,
-  uploadTrack,
 } from '../api'
 import { formatDuration } from '../utils'
 
@@ -17,6 +17,7 @@ export interface TrackStatus {
   trackId: string | null
   version: TrackVersion
   duration: number | null
+  filename: string | null
 }
 
 export interface TrackPanelHandle {
@@ -72,7 +73,7 @@ function bpmJumpSeverity(originalBpm: number, targetBpm: number): BpmJumpSeverit
 interface TrackPanelProps {
   index: number
   totalTracks: number
-  initialFile?: File
+  initialLibraryTrackId?: string
   existingTrack?: LoadedPlaylistTrack
   onRemove: () => void
   onMove: (newPosition: number) => void
@@ -80,11 +81,11 @@ interface TrackPanelProps {
 }
 
 export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function TrackPanel(
-  { index, totalTracks, initialFile, existingTrack, onRemove, onMove, onStatusChange },
+  { index, totalTracks, initialLibraryTrackId, existingTrack, onRemove, onMove, onStatusChange },
   ref,
 ) {
   const [track, setTrack] = useState<TrackInfo | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [targetBpm, setTargetBpm] = useState<number>(0)
   const [retempoing, setRetempoing] = useState(false)
@@ -94,13 +95,18 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   const [viewMode, setViewMode] = useState<TrackVersion>('original')
   const [isPlaying, setIsPlaying] = useState(false)
   const [positionInput, setPositionInput] = useState(String(index + 1))
-  const [lastFile, setLastFile] = useState<File | null>(null)
+  const [lastLibraryTrackId, setLastLibraryTrackId] = useState<string | null>(null)
   const [bpmInput, setBpmInput] = useState('')
 
   useEffect(() => {
     const duration =
       viewMode === 'retempo' && retempoDuration !== null ? retempoDuration : (track?.duration ?? null)
-    onStatusChange({ trackId: track?.track_id ?? null, version: viewMode, duration })
+    onStatusChange({
+      trackId: track?.track_id ?? null,
+      version: viewMode,
+      duration,
+      filename: track?.filename ?? null,
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track, viewMode, retempoDuration])
 
@@ -195,23 +201,23 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     }
   }, [])
 
-  async function uploadFile(file: File) {
-    setLastFile(file)
-    setUploading(true)
+  async function loadLibraryTrack(trackId: string) {
+    setLastLibraryTrackId(trackId)
+    setLoading(true)
     setError(null)
     setRetempoUrl(null)
     setRetempoBpm(null)
     setRetempoDuration(null)
     setViewMode('original')
     try {
-      const info = await uploadTrack(file)
+      const info = await analyzeLibraryTrack(trackId)
       setTrack(info)
       setTargetBpm(formatBpm(info.bpm))
       await wavesurferRef.current?.load(trackAudioUrl(info.track_id))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
-      setUploading(false)
+      setLoading(false)
     }
   }
 
@@ -254,15 +260,16 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     seededRef.current = true
 
     setTimeout(() => {
-      if (initialFile) {
-        void uploadFile(initialFile)
+      if (initialLibraryTrackId) {
+        void loadLibraryTrack(initialLibraryTrackId)
       } else if (existingTrack) {
         void hydrateExisting(existingTrack)
       }
     }, 0)
-    // initialFile/existingTrack are only meant to seed this instance once,
-    // on creation -- a given slot is always exactly one of "new upload" or
-    // "loaded from a saved mix", never both, never changing after mount
+    // initialLibraryTrackId/existingTrack are only meant to seed this
+    // instance once, on creation -- a given slot is always exactly one of
+    // "picked from My Songs" or "loaded from a saved mix", never both,
+    // never changing after mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -336,8 +343,8 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
       </div>
 
       <div className="upload-row">
-        {uploading ? (
-          <span className="filename">Uploading…</span>
+        {loading ? (
+          <span className="filename">Loading…</span>
         ) : (
           track && <span className="filename">{track.filename}</span>
         )}
@@ -346,8 +353,12 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
       {error && (
         <div className="error-row">
           <p className="error">{error}</p>
-          {lastFile && (
-            <button type="button" className="retry-button" onClick={() => uploadFile(lastFile)}>
+          {lastLibraryTrackId && (
+            <button
+              type="button"
+              className="retry-button"
+              onClick={() => loadLibraryTrack(lastLibraryTrackId)}
+            >
               Retry
             </button>
           )}

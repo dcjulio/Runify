@@ -1,13 +1,15 @@
 # Runify
 
-A local tool for building a running mix from your own downloaded music: upload songs, see their BPM/key, retempo them to match, drag transition points on the waveform, and export the whole queue as one continuous audio file.
+A local tool for building a running mix from your own downloaded music: drop songs into a My Songs folder, pick them in the app, see their BPM/key, retempo them to match, drag transition points on the waveform, and export the whole queue as one continuous audio file.
 
 Everything runs locally. Nothing is uploaded anywhere.
+
+Music lives in `Documents\Runify My Songs` (created automatically on first run) — the app reads files from there rather than copying them in, so picking the same song again never creates a duplicate.
 
 ## Architecture
 
 - **`backend/`** — Python (FastAPI). Does all the audio work: decoding, BPM/key detection (librosa), time-stretching, crossfade mixing, final render. Runs on `http://localhost:8001`.
-- **root** — React + TypeScript (Vite). The interactive UI: upload, waveform display, draggable transition markers. Runs on `http://localhost:5173`.
+- **root** — React + TypeScript (Vite). The interactive UI: pick songs from My Songs, waveform display, draggable transition markers. Runs on `http://localhost:5173`.
 
 ## Running it
 

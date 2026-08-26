@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -10,6 +11,14 @@ DATA_DIR.mkdir(exist_ok=True)
 PLAYLISTS_DIR = Path(__file__).resolve().parent.parent / "playlists"
 PLAYLISTS_DIR.mkdir(exist_ok=True)
 
+# Where the user drops their own downloaded music (via Explorer, outside the
+# app), sitting right next to the project itself. Tracks are picked from
+# here rather than uploaded through a browser file dialog -- picking the
+# same file twice reuses the same track_id (derived from its path below)
+# instead of creating a duplicate.
+LIBRARY_DIR = Path(__file__).resolve().parent.parent.parent / "My Songs"
+LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
+
 tracks: dict[str, dict] = {}
 
 
@@ -17,6 +26,15 @@ def track_dir(track_id: str) -> Path:
     d = DATA_DIR / track_id
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def track_id_for_path(path: Path) -> str:
+    """Deterministic id from a library file's absolute path -- so picking
+    the same file again (e.g. after a restart, or clicking Add twice)
+    always resolves to the same track_id instead of re-analyzing or
+    duplicating it. Renaming or moving the file is treated as a different
+    track, same as the user already understood when asking about this."""
+    return hashlib.sha1(str(path.resolve()).encode("utf-8")).hexdigest()
 
 
 def get_track(track_id: str) -> dict | None:
@@ -35,16 +53,18 @@ def save_track_meta(track_id: str) -> None:
         "key": track["key"],
         "duration": track["duration"],
         "sr": track["sr"],
-        "original_filename": track["original_path"].name,
+        # the audio itself lives wherever the user put it in the library
+        # folder -- it's never copied, so this is a reference, not a name
+        "source_path": str(track["original_path"]),
     }
     (track_dir(track_id) / "meta.json").write_text(json.dumps(meta))
 
 
 def rebuild_tracks_from_disk() -> None:
     """Repopulate the in-memory track index from meta.json sidecars on
-    disk. Runs at server startup so tracks uploaded in a previous run (and
+    disk. Runs at server startup so tracks analyzed in a previous run (and
     any saved playlists referencing them) are still there without
-    re-uploading -- the in-memory dict is otherwise wiped by every
+    re-analyzing -- the in-memory dict is otherwise wiped by every
     restart. Decoded audio is deliberately NOT reloaded here (expensive
     for a whole library); it's lazily decoded on first actual use by
     get_track_audio.
@@ -59,9 +79,12 @@ def rebuild_tracks_from_disk() -> None:
             meta = json.loads(meta_path.read_text())
         except (json.JSONDecodeError, OSError):
             continue
-        original_path = d / meta["original_filename"]
+        source_path = meta.get("source_path")
+        if not source_path:
+            continue  # from before the library folder existed -- orphaned
+        original_path = Path(source_path)
         if not original_path.exists():
-            continue
+            continue  # moved or deleted out of the library folder
         tracks[d.name] = {
             "original_path": original_path,
             "filename": meta["filename"],

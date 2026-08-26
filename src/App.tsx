@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  type LibraryEntry,
   type LoadedPlaylistTrack,
   exportMix,
+  listLibrary,
   listPlaylists,
   loadPlaylist,
+  openLibraryFolder,
   openPlaylistsFolder,
   savePlaylist,
 } from './api'
@@ -13,7 +16,7 @@ import './App.css'
 
 function App() {
   const [slots, setSlots] = useState<string[]>([])
-  const [initialFiles, setInitialFiles] = useState<Record<string, File>>({})
+  const [initialLibraryTrackIds, setInitialLibraryTrackIds] = useState<Record<string, string>>({})
   const [existingTracks, setExistingTracks] = useState<Record<string, LoadedPlaylistTrack>>({})
   const [statuses, setStatuses] = useState<Record<string, TrackStatus>>({})
   const [exporting, setExporting] = useState(false)
@@ -26,6 +29,11 @@ function App() {
   const [selectedPlaylist, setSelectedPlaylist] = useState('')
   const [loadingPlaylist, setLoadingPlaylist] = useState(false)
   const [playlistError, setPlaylistError] = useState<string | null>(null)
+  const [missingTracks, setMissingTracks] = useState<string[]>([])
+
+  const [libraryPath, setLibraryPath] = useState('')
+  const [libraryEntries, setLibraryEntries] = useState<LibraryEntry[]>([])
+  const [libraryError, setLibraryError] = useState<string | null>(null)
 
   const panelRefs = useRef<Record<string, TrackPanelHandle | null>>({})
 
@@ -38,24 +46,35 @@ function App() {
     }
   }
 
+  async function refreshLibrary() {
+    try {
+      const data = await listLibrary()
+      setLibraryPath(data.path)
+      setLibraryEntries(data.tracks)
+      setLibraryError(null)
+    } catch (err) {
+      setLibraryError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   useEffect(() => {
     void refreshPlaylistNames()
+    void refreshLibrary()
   }, [])
 
-  function handleAddSongs(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
-    if (files.length === 0) return
+  function handleAddFromLibrary(trackId: string) {
+    const newId = crypto.randomUUID()
+    setSlots((prev) => [...prev, newId])
+    setInitialLibraryTrackIds((prev) => ({ ...prev, [newId]: trackId }))
+  }
 
-    const newIds = files.map(() => crypto.randomUUID())
-    setSlots((prev) => [...prev, ...newIds])
-    setInitialFiles((prev) => {
-      const next = { ...prev }
-      newIds.forEach((id, i) => {
-        next[id] = files[i]
-      })
-      return next
-    })
-    e.target.value = ''
+  async function handleOpenLibraryFolder() {
+    setLibraryError(null)
+    try {
+      await openLibraryFolder()
+    } catch (err) {
+      setLibraryError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   function removeSlot(id: string) {
@@ -125,7 +144,7 @@ function App() {
     try {
       await savePlaylist(
         name,
-        readyTracks.map((s) => ({ track_id: s.trackId })),
+        readyTracks.map((s) => ({ track_id: s.trackId, filename: s.filename ?? s.trackId })),
       )
       await refreshPlaylistNames()
     } catch (err) {
@@ -139,12 +158,13 @@ function App() {
     if (!selectedPlaylist) return
     setLoadingPlaylist(true)
     setPlaylistError(null)
+    setMissingTracks([])
     try {
       const data = await loadPlaylist(selectedPlaylist)
       const newIds = data.tracks.map(() => crypto.randomUUID())
       setSlots(newIds)
       setStatuses({})
-      setInitialFiles({})
+      setInitialLibraryTrackIds({})
       setExistingTracks(() => {
         const next: Record<string, LoadedPlaylistTrack> = {}
         newIds.forEach((id, i) => {
@@ -152,6 +172,7 @@ function App() {
         })
         return next
       })
+      setMissingTracks(data.missing)
     } catch (err) {
       setPlaylistError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -223,6 +244,12 @@ function App() {
           </div>
         </div>
         {playlistError && <p className="error">{playlistError}</p>}
+        {missingTracks.length > 0 && (
+          <p className="mix-warning">
+            {missingTracks.length} song{missingTracks.length === 1 ? '' : 's'} from this mix
+            couldn't be found in My Songs (moved, renamed, or deleted): {missingTracks.join(', ')}
+          </p>
+        )}
 
         {readyTracks.length > 0 && (
           <div className="global-tempo-row">
@@ -250,23 +277,52 @@ function App() {
             }}
             index={index}
             totalTracks={slots.length}
-            initialFile={initialFiles[id]}
+            initialLibraryTrackId={initialLibraryTrackIds[id]}
             existingTrack={existingTracks[id]}
             onRemove={() => removeSlot(id)}
             onMove={(newPosition) => moveSlot(id, newPosition)}
             onStatusChange={(status) => updateStatus(id, status)}
           />
         ))}
-        <label className="add-song-button">
-          + Add song(s)
-          <input
-            type="file"
-            accept="audio/*"
-            multiple
-            onChange={handleAddSongs}
-            hidden
-          />
-        </label>
+
+        <div className="library-panel">
+          <div className="library-header">
+            <h2>My Songs</h2>
+            <button type="button" onClick={() => void refreshLibrary()}>
+              Refresh
+            </button>
+          </div>
+          {libraryError && <p className="error">{libraryError}</p>}
+          {libraryEntries.length > 0 && (
+            <ul className="library-list">
+              {libraryEntries.map((entry) => (
+                <li key={entry.track_id} className="library-item">
+                  <span className="library-filename">{entry.filename}</span>
+                  {entry.analyzed && entry.bpm !== null && (
+                    <span className="library-meta">
+                      {Math.round(entry.bpm)} BPM · {entry.key}
+                    </span>
+                  )}
+                  <button type="button" onClick={() => handleAddFromLibrary(entry.track_id)}>
+                    Add
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            className="add-song-button"
+            onClick={handleOpenLibraryFolder}
+            title={libraryPath || 'Open the folder where your music lives'}
+          >
+            + Add songs
+          </button>
+          <p className="library-hint">
+            Drop your downloaded music into the My Songs folder (subfolders are fine too), then
+            hit Refresh to see it above.
+          </p>
+        </div>
 
         <div className="export-row">
           <button

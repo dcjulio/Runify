@@ -36,3 +36,6 @@ backend/data/
 backend/playlists/
 __pycache__/
 *.pyc
+
+# Your own music -- lives in the project folder but never gets committed
+/My Songs/
