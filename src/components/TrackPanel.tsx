@@ -42,6 +42,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   const [viewMode, setViewMode] = useState<TrackVersion>('original')
   const [isPlaying, setIsPlaying] = useState(false)
   const [positionInput, setPositionInput] = useState(String(index + 1))
+  const [lastFile, setLastFile] = useState<File | null>(null)
 
   useEffect(() => {
     onStatusChange({ trackId: track?.track_id ?? null, version: viewMode })
@@ -84,6 +85,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
   }, [])
 
   async function uploadFile(file: File) {
+    setLastFile(file)
     setUploading(true)
     setError(null)
     setRetempoUrl(null)
@@ -183,7 +185,16 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
         )}
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <div className="error-row">
+          <p className="error">{error}</p>
+          {lastFile && (
+            <button type="button" className="retry-button" onClick={() => uploadFile(lastFile)}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
 
       <div ref={containerRef} className="waveform" />
 

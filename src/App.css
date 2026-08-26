@@ -155,6 +155,28 @@ header h1 {
   font-size: 0.9rem;
 }
 
+.error-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.retry-button {
+  background: transparent;
+  color: #ff6b6b;
+  border: 1px solid #ff6b6b55;
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.retry-button:hover {
+  background: #ff6b6b1a;
+}
+
 .waveform {
   margin: 1rem 0;
   border-radius: 8px;
