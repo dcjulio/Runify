@@ -215,7 +215,7 @@ function App() {
               onClick={handleOpenPlaylistsFolder}
               title="Open the folder where mixes are saved"
             >
-              Open folder
+              Open source folder
             </button>
           </div>
         </div>
