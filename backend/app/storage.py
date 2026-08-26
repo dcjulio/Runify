@@ -31,6 +31,7 @@ def save_track_meta(track_id: str) -> None:
     meta = {
         "filename": track["filename"],
         "bpm": track["bpm"],
+        "detected_bpm": track["detected_bpm"],
         "key": track["key"],
         "duration": track["duration"],
         "sr": track["sr"],
@@ -65,6 +66,10 @@ def rebuild_tracks_from_disk() -> None:
             "original_path": original_path,
             "filename": meta["filename"],
             "bpm": meta["bpm"],
+            # older meta.json files (written before BPM correction/reset
+            # existed) won't have this key -- fall back to bpm, the best
+            # available guess for what was originally detected
+            "detected_bpm": meta.get("detected_bpm", meta["bpm"]),
             "key": meta["key"],
             "duration": meta["duration"],
             "sr": meta["sr"],

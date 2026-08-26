@@ -88,6 +88,10 @@ async def upload_track(file: UploadFile = File(...)):
         "original_path": original_path,
         "filename": file.filename,
         "bpm": bpm,
+        # immutable record of what the code actually detected, kept
+        # alongside "bpm" (which the user can correct) so a correction can
+        # be reset back to it
+        "detected_bpm": bpm,
         "key": key,
         "duration": duration,
         "sr": sr,
@@ -102,6 +106,7 @@ async def upload_track(file: UploadFile = File(...)):
         "track_id": track_id,
         "filename": file.filename,
         "bpm": bpm,
+        "detected_bpm": bpm,
         "key": key,
         "duration": duration,
     }
@@ -194,7 +199,23 @@ def correct_track_bpm(track_id: str, req: BpmCorrectionRequest):
     storage.save_track_meta(track_id)
     storage.clear_track_retempo(track_id)
 
-    return {"track_id": track_id, "bpm": req.bpm}
+    return {"track_id": track_id, "bpm": req.bpm, "detected_bpm": track["detected_bpm"]}
+
+
+@app.post("/tracks/{track_id}/bpm/reset")
+def reset_track_bpm(track_id: str):
+    """Undoes a manual correction, back to what the code actually
+    detected. Same invalidation as a correction -- the reference tempo is
+    changing again, so any existing retempo render no longer matches it."""
+    track = get_track(track_id)
+    if not track:
+        raise HTTPException(404, "Track not found")
+
+    track["bpm"] = track["detected_bpm"]
+    storage.save_track_meta(track_id)
+    storage.clear_track_retempo(track_id)
+
+    return {"track_id": track_id, "bpm": track["bpm"], "detected_bpm": track["detected_bpm"]}
 
 
 class ExportTrackSpec(BaseModel):
@@ -305,6 +326,7 @@ def load_playlist(name: str):
                 "track_id": t.track_id,
                 "filename": track["filename"],
                 "bpm": track["bpm"],
+                "detected_bpm": track["detected_bpm"],
                 "key": track["key"],
                 "duration": track["duration"],
             }

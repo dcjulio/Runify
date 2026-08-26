@@ -4,6 +4,7 @@ export interface TrackInfo {
   track_id: string
   filename: string
   bpm: number
+  detected_bpm: number
   key: string
   duration: number
 }
@@ -44,7 +45,7 @@ export async function retempoTrack(
 export async function correctTrackBpm(
   trackId: string,
   bpm: number,
-): Promise<{ track_id: string; bpm: number }> {
+): Promise<{ track_id: string; bpm: number; detected_bpm: number }> {
   const res = await fetch(`${BASE_URL}/tracks/${trackId}/bpm`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -52,6 +53,16 @@ export async function correctTrackBpm(
   })
   if (!res.ok) {
     throw new Error(`BPM correction failed: ${res.status} ${await res.text()}`)
+  }
+  return res.json()
+}
+
+export async function resetTrackBpm(
+  trackId: string,
+): Promise<{ track_id: string; bpm: number; detected_bpm: number }> {
+  const res = await fetch(`${BASE_URL}/tracks/${trackId}/bpm/reset`, { method: 'POST' })
+  if (!res.ok) {
+    throw new Error(`BPM reset failed: ${res.status} ${await res.text()}`)
   }
   return res.json()
 }
@@ -103,6 +114,7 @@ export interface LoadedPlaylistTrack {
   track_id: string
   filename: string
   bpm: number
+  detected_bpm: number
   key: string
   duration: number
 }

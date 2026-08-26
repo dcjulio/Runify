@@ -287,6 +287,32 @@ header h1 {
   outline: none;
 }
 
+.bpm-value-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.reset-bpm-button {
+  background: transparent;
+  color: #8888a0;
+  border: 1px solid #3c3c4c;
+  border-radius: 6px;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.reset-bpm-button:hover {
+  color: #6c5ce7;
+  border-color: #6c5ce7;
+  background: #6c5ce71a;
+}
+
 .retempo-row {
   display: flex;
   align-items: center;

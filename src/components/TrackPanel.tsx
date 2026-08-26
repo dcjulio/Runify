@@ -5,6 +5,7 @@ import {
   type TrackInfo,
   type TrackVersion,
   correctTrackBpm,
+  resetTrackBpm,
   retempoAudioUrl,
   retempoTrack,
   trackAudioUrl,
@@ -136,6 +137,22 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     }
   }
 
+  async function handleResetBpm() {
+    if (!track) return
+    setError(null)
+    try {
+      const result = await resetTrackBpm(track.track_id)
+      setTrack({ ...track, bpm: result.bpm })
+      setRetempoUrl(null)
+      setRetempoBpm(null)
+      setRetempoDuration(null)
+      setViewMode('original')
+      await wavesurferRef.current?.load(trackAudioUrl(track.track_id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const containerRef = useRef<HTMLDivElement | null>(null)
   const wavesurferRef = useRef<WaveSurfer | null>(null)
 
@@ -187,6 +204,7 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
       track_id: t.track_id,
       filename: t.filename,
       bpm: t.bpm,
+      detected_bpm: t.detected_bpm,
       key: t.key,
       duration: t.duration,
     }
@@ -349,20 +367,32 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
           <div className="stats-row">
             <div className="stat">
               <span className="stat-label">Detected BPM</span>
-              <input
-                type="number"
-                className="bpm-correction-input"
-                min={20}
-                max={300}
-                step={0.01}
-                value={bpmInput}
-                onChange={(e) => setBpmInput(e.target.value)}
-                onBlur={commitBpmCorrection}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') e.currentTarget.blur()
-                }}
-                title="Automatically detected -- click to correct if it sounds wrong"
-              />
+              <div className="bpm-value-row">
+                <input
+                  type="number"
+                  className="bpm-correction-input"
+                  min={20}
+                  max={300}
+                  step={0.01}
+                  value={bpmInput}
+                  onChange={(e) => setBpmInput(e.target.value)}
+                  onBlur={commitBpmCorrection}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur()
+                  }}
+                  title="Automatically detected -- click to correct if it sounds wrong"
+                />
+                {track.bpm !== track.detected_bpm && (
+                  <button
+                    type="button"
+                    className="reset-bpm-button"
+                    onClick={handleResetBpm}
+                    title={`Reset to the automatically detected value: ${track.detected_bpm} BPM`}
+                  >
+                    ↺
+                  </button>
+                )}
+              </div>
             </div>
             <div className="stat">
               <span className="stat-label">Key</span>
