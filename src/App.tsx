@@ -4,6 +4,7 @@ import {
   exportMix,
   listPlaylists,
   loadPlaylist,
+  openPlaylistsFolder,
   savePlaylist,
 } from './api'
 import { TrackPanel, type TrackPanelHandle, type TrackStatus } from './components/TrackPanel'
@@ -155,6 +156,15 @@ function App() {
     }
   }
 
+  async function handleOpenPlaylistsFolder() {
+    setPlaylistError(null)
+    try {
+      await openPlaylistsFolder()
+    } catch (err) {
+      setPlaylistError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   return (
     <div className="app">
       <header>
@@ -198,6 +208,14 @@ function App() {
               disabled={!selectedPlaylist || loadingPlaylist}
             >
               {loadingPlaylist ? 'Loading…' : 'Load mix'}
+            </button>
+            <button
+              type="button"
+              className="open-folder-button"
+              onClick={handleOpenPlaylistsFolder}
+              title="Open the folder where mixes are saved"
+            >
+              Open folder
             </button>
           </div>
         </div>

@@ -105,3 +105,10 @@ export async function loadPlaylist(
   }
   return res.json()
 }
+
+export async function openPlaylistsFolder(): Promise<void> {
+  const res = await fetch(`${BASE_URL}/playlists/open-folder`, { method: 'POST' })
+  if (!res.ok) {
+    throw new Error(`Couldn't open the folder: ${res.status} ${await res.text()}`)
+  }
+}

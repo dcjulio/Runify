@@ -1,5 +1,6 @@
 import asyncio
 import io
+import os
 import re
 import shutil
 import uuid
@@ -126,6 +127,19 @@ def retempo_track(track_id: str, req: RetempoRequest):
     if req.target_bpm <= 0:
         raise HTTPException(400, "target_bpm must be positive")
 
+    # Skip recomputing if a render already sits there at this exact target
+    # -- e.g. loading a saved mix re-requests the same BPM every time, which
+    # was previously re-running the full WSOLA stretch for no reason.
+    if storage.get_track_retempo_bpm(track_id) == req.target_bpm:
+        cached = storage.get_track_retempo_audio(track_id)
+        if cached is not None:
+            cached_audio, cached_sr = cached
+            return {
+                "track_id": track_id,
+                "target_bpm": req.target_bpm,
+                "duration": cached_audio.shape[0] / cached_sr,
+            }
+
     audio = storage.get_track_audio(track_id)
     y_stretched = analysis.retempo(audio, track["sr"], track["bpm"], req.target_bpm)
     sr = track["sr"]
@@ -138,6 +152,7 @@ def retempo_track(track_id: str, req: RetempoRequest):
 
     out_path = track_dir(track_id) / "retempo.wav"
     sf.write(out_path, y_stretched, sr)
+    storage.save_track_retempo_bpm(track_id, req.target_bpm)
 
     return {
         "track_id": track_id,
@@ -274,3 +289,12 @@ def load_playlist(name: str):
             }
         )
     return {"name": name, "tracks": enriched}
+
+
+@app.post("/playlists/open-folder")
+def open_playlists_folder():
+    """Opens backend/playlists/ in the OS file explorer. Only meaningful
+    because this backend always runs locally on the same machine as the
+    person using it -- never do this in a real multi-user web app."""
+    os.startfile(storage.PLAYLISTS_DIR)  # noqa: S606 -- local-only tool, see above
+    return {"status": "ok"}

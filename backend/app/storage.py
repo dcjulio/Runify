@@ -98,3 +98,25 @@ def get_track_retempo_audio(track_id: str):
         track["retempo_audio"] = y
         track["retempo_sr"] = sr
     return track["retempo_audio"], track["retempo_sr"]
+
+
+def get_track_retempo_bpm(track_id: str) -> float | None:
+    """What target BPM the current retempo.wav (if any) was rendered at --
+    lets callers skip recomputing a retempo that's already sitting there at
+    the requested tempo (e.g. loading a saved mix re-requests the same BPM
+    every time). Checks memory first, falls back to a small sidecar on disk
+    written by save_track_retempo_bpm so this survives a restart too."""
+    track = tracks[track_id]
+    if "retempo_bpm" in track:
+        return track["retempo_bpm"]
+    meta_path = track_dir(track_id) / "retempo_meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        return json.loads(meta_path.read_text())["target_bpm"]
+    except (json.JSONDecodeError, OSError, KeyError):
+        return None
+
+
+def save_track_retempo_bpm(track_id: str, target_bpm: float) -> None:
+    (track_dir(track_id) / "retempo_meta.json").write_text(json.dumps({"target_bpm": target_bpm}))

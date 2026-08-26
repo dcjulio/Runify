@@ -353,6 +353,16 @@ header h1 {
   cursor: default;
 }
 
+.open-folder-button {
+  background: transparent !important;
+  color: #8888a0 !important;
+  font-size: 0.8rem !important;
+}
+
+.open-folder-button:hover {
+  color: #b5b5c8;
+}
+
 .global-tempo-row {
   display: flex;
   align-items: center;
