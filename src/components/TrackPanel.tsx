@@ -143,13 +143,30 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
     }
     setTrack(info)
     setTargetBpm(t.target_bpm ?? t.bpm)
-    await wavesurferRef.current?.load(trackAudioUrl(t.track_id))
+    // Load only the version we're actually going to end up showing --
+    // loading the original first and then immediately replacing it with
+    // the retempo waveform was wasteful, and combined with StrictMode's
+    // double-invoke of this effect (see below) could race and leave the
+    // original waveform showing instead of the retempo one.
     if (t.version === 'retempo' && t.target_bpm !== null) {
       await applyRetempo(t.track_id, t.target_bpm)
+    } else {
+      await wavesurferRef.current?.load(trackAudioUrl(t.track_id))
     }
   }
 
+  const seededRef = useRef(false)
+
   useEffect(() => {
+    // StrictMode (see main.tsx) deliberately mounts, unmounts, and
+    // remounts every component once in dev, re-running "on mount" effects
+    // twice. Without this guard, hydrateExisting/uploadFile would fire
+    // twice concurrently for the same track -- refs survive that simulated
+    // cycle (state does too), so checking one here reliably makes only the
+    // first invocation actually do anything.
+    if (seededRef.current) return
+    seededRef.current = true
+
     if (initialFile) {
       void uploadFile(initialFile)
     } else if (existingTrack) {

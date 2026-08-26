@@ -293,8 +293,35 @@ def load_playlist(name: str):
 
 @app.post("/playlists/open-folder")
 def open_playlists_folder():
-    """Opens backend/playlists/ in the OS file explorer. Only meaningful
-    because this backend always runs locally on the same machine as the
-    person using it -- never do this in a real multi-user web app."""
+    """Opens backend/playlists/ in the OS file explorer, and brings it to
+    the front. Only meaningful because this backend always runs locally on
+    the same machine as the person using it -- never do this in a real
+    multi-user web app."""
     os.startfile(storage.PLAYLISTS_DIR)  # noqa: S606 -- local-only tool, see above
+    _bring_explorer_to_front()
     return {"status": "ok"}
+
+
+def _bring_explorer_to_front() -> None:
+    """Windows blocks a background process (like this server) from
+    stealing focus for a window it opens -- by design, so background apps
+    can't yank focus away from whatever you're doing. Simulating a keypress
+    resets the OS's foreground-lock timeout, which is the standard
+    workaround. Best-effort: grabs whichever Explorer window is topmost, so
+    it can occasionally grab the wrong one if several are already open."""
+    try:
+        import ctypes
+        import time
+
+        user32 = ctypes.windll.user32
+        user32.keybd_event(0x12, 0, 0, 0)  # VK_MENU (Alt) down
+        user32.keybd_event(0x12, 0, 0x0002, 0)  # Alt up
+        for _ in range(10):
+            hwnd = user32.FindWindowW("CabinetWClass", None)
+            if hwnd:
+                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                user32.SetForegroundWindow(hwnd)
+                return
+            time.sleep(0.1)
+    except Exception:
+        pass  # best-effort only -- the folder still opened either way

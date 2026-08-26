@@ -354,13 +354,27 @@ header h1 {
 }
 
 .open-folder-button {
-  background: transparent !important;
-  color: #8888a0 !important;
-  font-size: 0.8rem !important;
+  background: #14141c;
+  color: #b5b5c8;
+  border: 1px solid #3c3c4c;
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.1s, transform 0.05s;
 }
 
 .open-folder-button:hover {
-  color: #b5b5c8;
+  background: #2c2c3a;
+  color: #eaeaf2;
+  border-color: #6c5ce7;
+}
+
+.open-folder-button:active {
+  background: #3c3c4c;
+  transform: scale(0.97);
 }
 
 .global-tempo-row {
