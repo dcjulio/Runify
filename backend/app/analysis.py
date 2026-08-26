@@ -77,10 +77,26 @@ def _wsola_search_offsets(
     count = 1
 
     prev_offset = 0
+    # Independent schedule for "where we should be reading to hit the
+    # requested tempo" -- advances by exactly hop_in every step, regardless
+    # of where the search actually lands. This must NOT be computed from
+    # prev_offset: the reference snippet below is always extracted starting
+    # at prev_offset + hop_out (the natural, un-stretched continuation), and
+    # earlier this function centered the search on prev_offset + hop_in too.
+    # That meant the position prev_offset + hop_out always fell inside the
+    # search window, and comparing that snippet against itself is a perfect
+    # match (correlation of exactly 1.0, the maximum possible) -- so the
+    # search deterministically picked +hop_out every time, silently
+    # ignoring hop_in and thus the requested tempo change entirely. Tracking
+    # the ideal position separately keeps it independent of the reference
+    # anchor, so it actually diverges from the trivial self-match over time
+    # once the accumulated difference exceeds tol.
+    ideal_pos = 0
     syn_pos = hop_out
 
-    while syn_pos + frame_len < out_len and prev_offset < max_offset:
-        ideal = prev_offset + hop_in
+    while syn_pos + frame_len < out_len:
+        ideal_pos += hop_in
+        ideal = ideal_pos
         lo = ideal - tol
         if lo < 0:
             lo = 0
