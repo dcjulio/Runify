@@ -10,7 +10,7 @@ import {
 } from './api'
 import { LibraryPicker } from './components/LibraryPicker'
 import { TrackPanel, type TrackPanelHandle, type TrackStatus } from './components/TrackPanel'
-import { formatDuration } from './utils'
+import { estimateExportSeconds, formatDuration } from './utils'
 import './App.css'
 
 function App() {
@@ -20,6 +20,11 @@ function App() {
   const [statuses, setStatuses] = useState<Record<string, TrackStatus>>({})
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [exportSuccess, setExportSuccess] = useState(false)
+  const [exportElapsed, setExportElapsed] = useState(0)
+  const [exportEstimate, setExportEstimate] = useState(0)
+  const exportTimerRef = useRef<number | null>(null)
+  const exportSuccessTimerRef = useRef<number | null>(null)
   const [exportFormat, setExportFormat] = useState<ExportFormat>('flac')
   const [globalTargetBpm, setGlobalTargetBpm] = useState<number>(120)
   const [applyingAll, setApplyingAll] = useState(false)
@@ -110,20 +115,29 @@ function App() {
   async function handleExportMix() {
     setExporting(true)
     setExportError(null)
-    try {
-      const blob = await exportMix(
-        readyTracks.map((s) => ({ track_id: s.trackId, version: s.version })),
-        exportFormat,
-      )
-      const suggestedName = `runify-mix.${exportFormat}`
+    setExportSuccess(false)
+    if (exportSuccessTimerRef.current !== null) {
+      window.clearTimeout(exportSuccessTimerRef.current)
+      exportSuccessTimerRef.current = null
+    }
+    setExportElapsed(0)
+    setExportEstimate(estimateExportSeconds(totalDuration, exportFormat))
+    const startedAt = Date.now()
+    exportTimerRef.current = window.setInterval(() => {
+      setExportElapsed(Math.round((Date.now() - startedAt) / 1000))
+    }, 1000)
 
+    const suggestedName = `runify-mix.${exportFormat}`
+    let handle: FileSystemFileHandle | undefined
+    try {
       const showSaveFilePicker = window.showSaveFilePicker
       if (showSaveFilePicker) {
-        // Lets the user pick the folder and filename via a native Save As
-        // dialog, instead of always dropping into the browser's default
-        // downloads folder under a fixed name. Chromium-only (Chrome/Edge)
-        // -- Firefox/Safari fall through to the plain download below.
-        const handle = await showSaveFilePicker({
+        // Must happen before any await -- Chromium only allows this while
+        // still inside the click's "user activation" window, so grab the
+        // handle first and write to it once the export actually finishes.
+        // Firefox/Safari (no showSaveFilePicker) fall through to the plain
+        // download below.
+        handle = await showSaveFilePicker({
           suggestedName,
           types: [
             {
@@ -132,6 +146,14 @@ function App() {
             },
           ],
         })
+      }
+
+      const blob = await exportMix(
+        readyTracks.map((s) => ({ track_id: s.trackId, version: s.version })),
+        exportFormat,
+      )
+
+      if (handle) {
         const writable = await handle.createWritable()
         await writable.write(blob)
         await writable.close()
@@ -143,13 +165,24 @@ function App() {
         a.click()
         URL.revokeObjectURL(url)
       }
+      setExportSuccess(true)
+      exportSuccessTimerRef.current = window.setTimeout(() => setExportSuccess(false), 60000)
     } catch (err) {
       // the user clicking "Cancel" on the save dialog throws this -- not a
       // real error, so don't show it as one
       if (err instanceof DOMException && err.name === 'AbortError') return
+      // picker succeeded but the export itself failed -- clean up the empty
+      // file it already created at the chosen location
+      if (handle) {
+        await handle.remove().catch(() => {})
+      }
       setExportError(err instanceof Error ? err.message : String(err))
     } finally {
       setExporting(false)
+      if (exportTimerRef.current !== null) {
+        window.clearInterval(exportTimerRef.current)
+        exportTimerRef.current = null
+      }
     }
   }
 
@@ -279,11 +312,17 @@ function App() {
             disabled={readyTracks.length === 0 || exporting || applyingAll}
           >
             {exporting
-              ? 'Exporting…'
+              ? `Exporting… ${exportElapsed}s`
               : applyingAll
                 ? 'Waiting for queue…'
                 : `Export mix (${readyTracks.length} track${readyTracks.length === 1 ? '' : 's'}, ${formatDuration(totalDuration)})`}
           </button>
+          {exporting && (
+            <span className="export-progress-hint">
+              est. ~{exportEstimate}s total
+            </span>
+          )}
+          {exportSuccess && <p className="export-success">Export successful.</p>}
           <div className="export-format-row">
             <div className="export-format-toggle">
               <button

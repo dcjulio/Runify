@@ -16,6 +16,7 @@ interface FileSystemWritableFileStream {
 
 interface FileSystemFileHandle {
   createWritable(): Promise<FileSystemWritableFileStream>
+  remove(): Promise<void>
 }
 
 interface Window {
