@@ -282,6 +282,7 @@ class ExportTrackSpec(BaseModel):
 
 class ExportRequest(BaseModel):
     tracks: list[ExportTrackSpec]
+    format: Literal["wav", "flac"] = "flac"
 
 
 @app.post("/mix/export")
@@ -320,12 +321,13 @@ def export_mix(req: ExportRequest):
     mixed = np.concatenate(segments, axis=0)
 
     buffer = io.BytesIO()
-    sf.write(buffer, mixed, target_sr, format="WAV")
+    sf.write(buffer, mixed, target_sr, format=req.format.upper())
 
+    media_type = "audio/flac" if req.format == "flac" else "audio/wav"
     return Response(
         content=buffer.getvalue(),
-        media_type="audio/wav",
-        headers={"Content-Disposition": 'attachment; filename="runify-mix.wav"'},
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="runify-mix.{req.format}"'},
     )
 
 

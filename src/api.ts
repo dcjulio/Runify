@@ -97,11 +97,13 @@ export interface ExportTrackSpec {
   version: TrackVersion
 }
 
-export async function exportMix(tracks: ExportTrackSpec[]): Promise<Blob> {
+export type ExportFormat = 'wav' | 'flac'
+
+export async function exportMix(tracks: ExportTrackSpec[], format: ExportFormat): Promise<Blob> {
   const res = await fetch(`${BASE_URL}/mix/export`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tracks }),
+    body: JSON.stringify({ tracks, format }),
   })
   if (!res.ok) {
     throw new Error(`Export failed: ${res.status} ${await res.text()}`)

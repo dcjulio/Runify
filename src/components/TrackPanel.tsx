@@ -21,7 +21,7 @@ export interface TrackStatus {
 }
 
 export interface TrackPanelHandle {
-  applyTempo: (bpm: number) => void
+  applyTempo: (bpm: number) => Promise<void>
 }
 
 // BPM detection (and DJ tempo-matching in general) is ambiguous at
@@ -75,13 +75,25 @@ interface TrackPanelProps {
   totalTracks: number
   initialLibraryTrackId?: string
   existingTrack?: LoadedMixTrack
+  queued?: boolean
+  applyDisabled?: boolean
   onRemove: () => void
   onMove: (newPosition: number) => void
   onStatusChange: (status: TrackStatus) => void
 }
 
 export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function TrackPanel(
-  { index, totalTracks, initialLibraryTrackId, existingTrack, onRemove, onMove, onStatusChange },
+  {
+    index,
+    totalTracks,
+    initialLibraryTrackId,
+    existingTrack,
+    queued,
+    applyDisabled,
+    onRemove,
+    onMove,
+    onStatusChange,
+  },
   ref,
 ) {
   const [track, setTrack] = useState<TrackInfo | null>(null)
@@ -301,9 +313,9 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
 
   useImperativeHandle(ref, () => ({
     applyTempo: (bpm: number) => {
-      if (!track) return
+      if (!track) return Promise.resolve()
       const effectiveBpm = nearestOctaveTarget(track.bpm, bpm)
-      void applyRetempo(track.track_id, effectiveBpm)
+      return applyRetempo(track.track_id, effectiveBpm)
     },
   }))
 
@@ -454,9 +466,10 @@ export const TrackPanel = forwardRef<TrackPanelHandle, TrackPanelProps>(function
               value={targetBpm}
               onChange={(e) => setTargetBpm(Number(e.target.value))}
             />
-            <button type="button" onClick={handleApplyRetempo} disabled={retempoing}>
+            <button type="button" onClick={handleApplyRetempo} disabled={retempoing || applyDisabled}>
               {retempoing ? 'Rendering…' : 'Apply'}
             </button>
+            {queued && !retempoing && <span className="queue-badge">Queued…</span>}
             {(() => {
               const severity = bpmJumpSeverity(track.bpm, targetBpm)
               if (severity === 'none') return null

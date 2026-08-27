@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  type ExportFormat,
   type LoadedMixTrack,
   exportMix,
   listMixes,
@@ -19,7 +20,10 @@ function App() {
   const [statuses, setStatuses] = useState<Record<string, TrackStatus>>({})
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('flac')
   const [globalTargetBpm, setGlobalTargetBpm] = useState<number>(120)
+  const [applyingAll, setApplyingAll] = useState(false)
+  const [queuedSlots, setQueuedSlots] = useState<Set<string>>(new Set())
 
   const [mixNames, setMixNames] = useState<string[]>([])
   const [saveName, setSaveName] = useState('')
@@ -85,10 +89,22 @@ function App() {
 
   const totalDuration = readyTracks.reduce((sum, s) => sum + (s.duration ?? 0), 0)
 
-  function handleApplyToAll() {
-    slots.forEach((id) => {
-      panelRefs.current[id]?.applyTempo(globalTargetBpm)
-    })
+  async function handleApplyToAll() {
+    setApplyingAll(true)
+    setQueuedSlots(new Set(slots))
+    try {
+      for (const id of slots) {
+        setQueuedSlots((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+        await panelRefs.current[id]?.applyTempo(globalTargetBpm)
+      }
+    } finally {
+      setApplyingAll(false)
+      setQueuedSlots(new Set())
+    }
   }
 
   async function handleExportMix() {
@@ -97,11 +113,12 @@ function App() {
     try {
       const blob = await exportMix(
         readyTracks.map((s) => ({ track_id: s.trackId, version: s.version })),
+        exportFormat,
       )
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'runify-mix.wav'
+      a.download = `runify-mix.${exportFormat}`
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
@@ -219,6 +236,53 @@ function App() {
           </p>
         )}
 
+        <button type="button" className="add-song-button" onClick={() => setShowLibraryPicker(true)}>
+          + Add song(s)
+        </button>
+        {showLibraryPicker && (
+          <LibraryPicker
+            onClose={() => setShowLibraryPicker(false)}
+            onPick={handleAddFromLibrary}
+          />
+        )}
+
+        <div className="export-row">
+          <div className="export-format-row">
+            <div className="export-format-toggle">
+              <button
+                type="button"
+                className={exportFormat === 'flac' ? 'active' : ''}
+                onClick={() => setExportFormat('flac')}
+              >
+                FLAC
+              </button>
+              <button
+                type="button"
+                className={exportFormat === 'wav' ? 'active' : ''}
+                onClick={() => setExportFormat('wav')}
+              >
+                WAV
+              </button>
+            </div>
+            <span className="export-format-hint">
+              {exportFormat === 'flac'
+                ? 'Lossless, faster export.'
+                : 'Maximum compatibility with older players.'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="download-mix-button"
+            onClick={handleExportMix}
+            disabled={readyTracks.length === 0 || exporting}
+          >
+            {exporting
+              ? 'Exporting…'
+              : `Export mix (${readyTracks.length} track${readyTracks.length === 1 ? '' : 's'}, ${formatDuration(totalDuration)})`}
+          </button>
+          {exportError && <p className="error">{exportError}</p>}
+        </div>
+
         {readyTracks.length > 0 && (
           <div className="global-tempo-row">
             <label htmlFor="global-target-bpm">Target BPM for all</label>
@@ -231,8 +295,8 @@ function App() {
               value={globalTargetBpm}
               onChange={(e) => setGlobalTargetBpm(Number(e.target.value))}
             />
-            <button type="button" onClick={handleApplyToAll}>
-              Apply to all
+            <button type="button" onClick={() => void handleApplyToAll()} disabled={applyingAll}>
+              {applyingAll ? 'Applying…' : 'Apply to all'}
             </button>
           </div>
         )}
@@ -247,35 +311,13 @@ function App() {
             totalTracks={slots.length}
             initialLibraryTrackId={initialLibraryTrackIds[id]}
             existingTrack={existingTracks[id]}
+            queued={queuedSlots.has(id)}
+            applyDisabled={applyingAll}
             onRemove={() => removeSlot(id)}
             onMove={(newPosition) => moveSlot(id, newPosition)}
             onStatusChange={(status) => updateStatus(id, status)}
           />
         ))}
-
-        <button type="button" className="add-song-button" onClick={() => setShowLibraryPicker(true)}>
-          + Add song(s)
-        </button>
-        {showLibraryPicker && (
-          <LibraryPicker
-            onClose={() => setShowLibraryPicker(false)}
-            onPick={handleAddFromLibrary}
-          />
-        )}
-
-        <div className="export-row">
-          <button
-            type="button"
-            className="download-mix-button"
-            onClick={handleExportMix}
-            disabled={readyTracks.length === 0 || exporting}
-          >
-            {exporting
-              ? 'Exporting…'
-              : `Export mix (${readyTracks.length} track${readyTracks.length === 1 ? '' : 's'}, ${formatDuration(totalDuration)})`}
-          </button>
-          {exportError && <p className="error">{exportError}</p>}
-        </div>
       </main>
     </div>
   )
