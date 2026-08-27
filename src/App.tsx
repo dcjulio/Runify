@@ -115,13 +115,38 @@ function App() {
         readyTracks.map((s) => ({ track_id: s.trackId, version: s.version })),
         exportFormat,
       )
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `runify-mix.${exportFormat}`
-      a.click()
-      URL.revokeObjectURL(url)
+      const suggestedName = `runify-mix.${exportFormat}`
+
+      const showSaveFilePicker = window.showSaveFilePicker
+      if (showSaveFilePicker) {
+        // Lets the user pick the folder and filename via a native Save As
+        // dialog, instead of always dropping into the browser's default
+        // downloads folder under a fixed name. Chromium-only (Chrome/Edge)
+        // -- Firefox/Safari fall through to the plain download below.
+        const handle = await showSaveFilePicker({
+          suggestedName,
+          types: [
+            {
+              description: exportFormat.toUpperCase(),
+              accept: { [`audio/${exportFormat}`]: [`.${exportFormat}`] },
+            },
+          ],
+        })
+        const writable = await handle.createWritable()
+        await writable.write(blob)
+        await writable.close()
+      } else {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = suggestedName
+        a.click()
+        URL.revokeObjectURL(url)
+      }
     } catch (err) {
+      // the user clicking "Cancel" on the save dialog throws this -- not a
+      // real error, so don't show it as one
+      if (err instanceof DOMException && err.name === 'AbortError') return
       setExportError(err instanceof Error ? err.message : String(err))
     } finally {
       setExporting(false)
@@ -247,6 +272,18 @@ function App() {
         )}
 
         <div className="export-row">
+          <button
+            type="button"
+            className="download-mix-button"
+            onClick={handleExportMix}
+            disabled={readyTracks.length === 0 || exporting || applyingAll}
+          >
+            {exporting
+              ? 'Exporting…'
+              : applyingAll
+                ? 'Waiting for queue…'
+                : `Export mix (${readyTracks.length} track${readyTracks.length === 1 ? '' : 's'}, ${formatDuration(totalDuration)})`}
+          </button>
           <div className="export-format-row">
             <div className="export-format-toggle">
               <button
@@ -270,16 +307,6 @@ function App() {
                 : 'Maximum compatibility with older players.'}
             </span>
           </div>
-          <button
-            type="button"
-            className="download-mix-button"
-            onClick={handleExportMix}
-            disabled={readyTracks.length === 0 || exporting}
-          >
-            {exporting
-              ? 'Exporting…'
-              : `Export mix (${readyTracks.length} track${readyTracks.length === 1 ? '' : 's'}, ${formatDuration(totalDuration)})`}
-          </button>
           {exportError && <p className="error">{exportError}</p>}
         </div>
 
