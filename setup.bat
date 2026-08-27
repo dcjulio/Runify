@@ -77,7 +77,7 @@ echo.
 cd /d "%~dp0"
 
 echo Installing frontend dependencies ^(this can take a minute^)...
-call npm install
+call npm install --prefix frontend
 if errorlevel 1 (
     echo.
     echo npm install failed -- see the errors above.

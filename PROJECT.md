@@ -20,7 +20,7 @@ is uploaded anywhere. See [README.md](README.md) for setup/run instructions.
   - `app/main.py` — API routes
   - `app/analysis.py` — BPM/key detection, audio analysis
   - `app/storage.py` — reading from / writing to `My Songs`, saved mixes
-- **root** — React + TypeScript (Vite), port 5173. Interactive UI.
+- **`frontend/`** — React + TypeScript (Vite), port 5173. Interactive UI.
   - `src/App.tsx` — main app state/orchestration
   - `src/components/LibraryPicker.tsx` — Explorer-style song picker
   - `src/components/TrackPanel.tsx` — per-track waveform, BPM/key display,
@@ -33,9 +33,18 @@ The collaboration rules (ask before changing code, commit = commit+push,
 Claude co-author trailer) live in [CLAUDE.md](CLAUDE.md) and are
 auto-loaded every session — no need to duplicate them here.
 
-## Where things stand (updated 2026-08-27)
+## Where things stand (updated 2026-08-28)
 
 Most recent work, newest first:
+- Moved the frontend scaffolding (`package.json`, `index.html`,
+  `vite.config.ts`, `tsconfig*.json`, `.oxlintrc.json`, `src/`, `public/`)
+  into `frontend/`, mirroring `backend/`. Root now holds just `setup.bat`,
+  `start-runify.bat`, `README.md`, `LICENSE`, `CLAUDE.md`, `PROJECT.md`, and
+  `My Songs/`. Both `.bat` scripts and the README were updated accordingly.
+- Fixed export's native Save As dialog throwing a "must be handling a user
+  gesture" error (the picker was being called after an `await`, outside the
+  click's activation window); added a live elapsed-time counter and rough
+  ETA while exporting, plus a success message shown for a minute after.
 - `setup.bat` for one-click first-time setup (checks/installs Python, Node,
   ffmpeg via winget); native Save As dialog on export; export is blocked
   while the apply-to-all queue is running

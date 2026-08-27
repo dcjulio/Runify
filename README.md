@@ -9,7 +9,7 @@ Music lives in a `My Songs` folder next to the project (created automatically on
 ## Architecture
 
 - **`backend/`** — Python (FastAPI). Does all the audio work: decoding, BPM/key detection (librosa), time-stretching, crossfade mixing, final render. Runs on `http://localhost:8001`.
-- **root** — React + TypeScript (Vite). The interactive UI: pick songs from My Songs, waveform display, draggable transition markers. Runs on `http://localhost:5173`.
+- **`frontend/`** — React + TypeScript (Vite). The interactive UI: pick songs from My Songs, waveform display, draggable transition markers. Runs on `http://localhost:5173`.
 
 ## First-time setup
 
@@ -19,7 +19,9 @@ Music lives in a `My Songs` folder next to the project (created automatically on
 
 ```
 # frontend deps
+cd frontend
 npm install
+cd ..
 
 # backend venv + deps
 cd backend
@@ -49,6 +51,7 @@ uvicorn app.main:app --reload --port 8001
 **Frontend:**
 
 ```
+cd frontend
 npm run dev
 ```
 
